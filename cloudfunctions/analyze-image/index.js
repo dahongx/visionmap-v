@@ -41,7 +41,7 @@ exports.main = async (event, context) => {
     // 使用 setTimeout 在后台处理AI请求
     setTimeout(() => {
       processImageAsync(fileID, openid, recordId)
-    }, 0)
+    }, 100)
 
     console.log('=== analyze-image 返回 ===')
     return {
