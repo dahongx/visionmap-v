@@ -115,20 +115,21 @@ Page({
       return
     }
 
-    if (this.data.points < 10) {
-      wx.showModal({
-        title: '积分不足',
-        content: '当前积分不足，是否邀请好友获取积分？',
-        confirmText: '去邀请',
-        cancelText: '取消',
-        success: (res) => {
-          if (res.confirm) {
-            wx.switchTab({ url: '/pages/profile/profile' })
-          }
-        }
-      })
-      return
-    }
+    // 测试模式：跳过积分检查
+    // if (this.data.points < 10) {
+    //   wx.showModal({
+    //     title: '积分不足',
+    //     content: '当前积分不足，是否邀请好友获取积分？',
+    //     confirmText: '去邀请',
+    //     cancelText: '取消',
+    //     success: (res) => {
+    //       if (res.confirm) {
+    //         wx.switchTab({ url: '/pages/profile/profile' })
+    //       }
+    //     }
+    //   })
+    //   return
+    // }
 
     this.setData({
       loading: true,
@@ -154,8 +155,8 @@ Page({
 
       const recordId = analyzeRes.data._id
 
-      // 3. 扣除积分
-      await api.deductPoints(10, '手写笔记转导图')
+      // 3. 测试模式：不扣除积分
+      // await api.deductPoints(10, '手写笔记转导图')
 
       this.setData({ loadingText: '正在生成导图，请耐心等待...' })
 

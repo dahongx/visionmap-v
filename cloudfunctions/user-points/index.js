@@ -44,7 +44,8 @@ async function getUserPoints(openid) {
   try {
     const res = await usersCollection.doc(openid).get()
     if (res.data) {
-      return { code: 0, points: res.data.points || 0 }
+      // 测试模式：返回无限积分
+      return { code: 0, points: 9999 }
     }
   } catch (err) {
     // 用户不存在，创建新用户
@@ -52,19 +53,19 @@ async function getUserPoints(openid) {
       await usersCollection.add({
         data: {
           _id: openid,
-          points: 50,
+          points: 9999,
           createdAt: db.serverDate(),
           lastSignIn: null
         }
       })
-      return { code: 0, points: 50 }
+      return { code: 0, points: 9999 }
     } catch (createErr) {
       console.error('创建用户失败', createErr)
-      return { code: 0, points: 50 }
+      return { code: 0, points: 9999 }
     }
   }
 
-  return { code: 0, points: 50 }
+  return { code: 0, points: 9999 }
 }
 
 // 扣除积分
