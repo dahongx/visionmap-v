@@ -41,20 +41,28 @@ exports.main = async (event, context) => {
 
 // 获取用户积分
 async function getUserPoints(openid) {
-  const res = await usersCollection.doc(openid).get()
-  if (res.data) {
-    return { code: 0, points: res.data.points }
-  }
-
-  // 用户不存在，创建新用户
-  await usersCollection.doc(openid).set({
-    data: {
-      _id: openid,
-      points: 50,
-      createdAt: db.serverDate(),
-      lastSignIn: null
+  try {
+    const res = await usersCollection.doc(openid).get()
+    if (res.data) {
+      return { code: 0, points: res.data.points || 0 }
     }
-  })
+  } catch (err) {
+    // 用户不存在，创建新用户
+    try {
+      await usersCollection.add({
+        data: {
+          _id: openid,
+          points: 50,
+          createdAt: db.serverDate(),
+          lastSignIn: null
+        }
+      })
+      return { code: 0, points: 50 }
+    } catch (createErr) {
+      console.error('创建用户失败', createErr)
+      return { code: 0, points: 50 }
+    }
+  }
 
   return { code: 0, points: 50 }
 }

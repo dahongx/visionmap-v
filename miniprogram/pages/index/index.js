@@ -34,11 +34,16 @@ Page({
   async getUserPoints() {
     try {
       const res = await api.getUserPoints()
-      this.setData({
-        points: res.points
-      })
+      if (res && res.code === 0) {
+        this.setData({
+          points: res.points || 0
+        })
+      } else {
+        this.setData({ points: 0 })
+      }
     } catch (err) {
       console.error('获取积分失败', err)
+      this.setData({ points: 0 })
     }
   },
 
