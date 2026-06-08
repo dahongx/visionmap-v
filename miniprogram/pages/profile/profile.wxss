@@ -1,0 +1,106 @@
+.user-section {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40rpx 30rpx;
+  border-radius: 16rpx;
+  margin-bottom: 30rpx;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  margin-right: 30rpx;
+  font-size: 60rpx;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.nickname {
+  font-size: 36rpx;
+  color: white;
+  font-weight: bold;
+  display: block;
+}
+
+.points {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.8);
+  margin-top: 10rpx;
+  display: block;
+}
+
+.login-btn {
+  background: white;
+  color: #667eea;
+  font-size: 28rpx;
+  padding: 16rpx 32rpx;
+  border-radius: 30rpx;
+}
+
+.points-section {
+  background: white;
+  border-radius: 16rpx;
+  padding: 20rpx 30rpx;
+  margin-bottom: 30rpx;
+}
+
+.points-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.points-item:last-child {
+  border-bottom: none;
+}
+
+.points-label {
+  font-size: 30rpx;
+  color: #333;
+}
+
+.points-value {
+  font-size: 30rpx;
+  color: #667eea;
+}
+
+.menu-section {
+  background: white;
+  border-radius: 16rpx;
+  padding: 0 30rpx;
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:active {
+  background: #f8f8f8;
+}
+
+.menu-text {
+  font-size: 30rpx;
+  color: #333;
+}
+
+.menu-arrow {
+  font-size: 28rpx;
+  color: #999;
+}

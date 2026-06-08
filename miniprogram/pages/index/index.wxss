@@ -1,0 +1,160 @@
+.header {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+}
+
+.subtitle {
+  font-size: 28rpx;
+  color: #999;
+  margin-top: 10rpx;
+  display: block;
+}
+
+.upload-area {
+  display: flex;
+  justify-content: space-around;
+  margin: 40rpx 0;
+}
+
+.upload-card {
+  width: 300rpx;
+  height: 240rpx;
+  background: white;
+  border-radius: 16rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
+}
+
+.upload-card:active {
+  transform: scale(0.98);
+}
+
+.upload-icon {
+  font-size: 80rpx;
+  margin-bottom: 16rpx;
+}
+
+.upload-text {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.upload-desc {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+.type-section {
+  margin: 40rpx 0;
+}
+
+.section-title {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.type-list {
+  display: flex;
+  justify-content: space-between;
+}
+
+.type-item {
+  flex: 1;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12rpx;
+  margin: 0 10rpx;
+  font-size: 28rpx;
+  color: #666;
+}
+
+.type-item:first-child {
+  margin-left: 0;
+}
+
+.type-item:last-child {
+  margin-right: 0;
+}
+
+.type-item.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.points-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 20rpx;
+  background: white;
+  border-radius: 12rpx;
+  margin: 30rpx 0;
+  font-size: 28rpx;
+}
+
+.points-cost {
+  color: #667eea;
+}
+
+.generate-btn {
+  width: 100%;
+  margin-top: 30rpx;
+}
+
+.loading-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.loading-content {
+  background: white;
+  padding: 40rpx 60rpx;
+  border-radius: 16rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #f0f0f0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  color: #666;
+}

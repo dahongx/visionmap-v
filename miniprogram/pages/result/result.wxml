@@ -1,0 +1,58 @@
+<view class="container">
+  <!-- 工具栏 -->
+  <view class="toolbar">
+    <view class="tool-btn" bindtap="zoomIn">
+      <text>🔍+</text>
+    </view>
+    <view class="tool-btn" bindtap="zoomOut">
+      <text>🔍-</text>
+    </view>
+    <view class="tool-btn" bindtap="fitView">
+      <text>📐</text>
+    </view>
+    <view class="tool-btn" bindtap="undo">
+      <text>↩️</text>
+    </view>
+    <view class="tool-btn" bindtap="redo">
+      <text>↪️</text>
+    </view>
+  </view>
+
+  <!-- 思维导图画布 -->
+  <view class="canvas-container" bindtouchstart="onTouchStart" bindtouchmove="onTouchMove" bindtouchend="onTouchEnd">
+    <canvas canvas-id="mindmapCanvas" class="mindmap-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"></canvas>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="action-bar">
+    <view class="action-btn" bindtap="addNode">
+      <text>➕ 添加节点</text>
+    </view>
+    <view class="action-btn primary" bindtap="exportImage">
+      <text>📸 导出图片</text>
+    </view>
+    <view class="action-btn" bindtap="exportPDF">
+      <text>📄 导出PDF</text>
+    </view>
+  </view>
+
+  <!-- 节点编辑弹窗 -->
+  <view class="edit-modal" wx:if="{{showEditModal}}">
+    <view class="edit-content">
+      <text class="edit-title">编辑节点</text>
+      <input class="edit-input" value="{{editingNode.text}}" bindinput="onNodeInput" placeholder="输入节点内容"/>
+      <view class="edit-buttons">
+        <view class="edit-btn cancel" bindtap="cancelEdit">取消</view>
+        <view class="edit-btn confirm" bindtap="confirmEdit">确定</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 加载提示 -->
+<view class="loading-mask" wx:if="{{loading}}">
+  <view class="loading-content">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">{{loadingText}}</text>
+  </view>
+</view>
