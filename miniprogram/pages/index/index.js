@@ -11,6 +11,9 @@ Page({
     recentRecords: []
   },
 
+  // 轮询定时器
+  pollTimer: null,
+
   onLoad() {
     this.getUserPoints()
     this.loadRecentRecords()
@@ -18,6 +21,13 @@ Page({
 
   onShow() {
     this.loadRecentRecords()
+  },
+
+  onUnload() {
+    // 清除定时器
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer)
+    }
   },
 
   // 获取用户积分
@@ -87,10 +97,8 @@ Page({
   // 主按钮点击事件
   handleMainAction() {
     if (this.data.tempFilePath) {
-      // 已选择图片，生成导图
       this.generateMindmap()
     } else {
-      // 未选择图片，拍照
       this.chooseImage()
     }
   },
@@ -98,10 +106,7 @@ Page({
   // 生成思维导图
   async generateMindmap() {
     if (!this.data.tempFilePath) {
-      wx.showToast({
-        title: '请先选择图片',
-        icon: 'none'
-      })
+      wx.showToast({ title: '请先选择图片', icon: 'none' })
       return
     }
 
@@ -113,9 +118,7 @@ Page({
         cancelText: '取消',
         success: (res) => {
           if (res.confirm) {
-            wx.switchTab({
-              url: '/pages/profile/profile'
-            })
+            wx.switchTab({ url: '/pages/profile/profile' })
           }
         }
       })
@@ -137,31 +140,22 @@ Page({
 
       this.setData({ loadingText: '正在识别笔迹...' })
 
-      // 2. 调用云函数分析图片
+      // 2. 调用云函数（立即返回记录ID）
       const analyzeRes = await api.analyzeImage(uploadRes.fileID)
 
       if (analyzeRes.code !== 0) {
         throw new Error(analyzeRes.message || '分析失败')
       }
 
-      this.setData({ loadingText: '正在生成导图...' })
+      const recordId = analyzeRes.data._id
 
-      // 3. 生成思维导图
-      const mindmapRes = await api.generateMindmap(analyzeRes.data, 'mindmap')
-
-      if (mindmapRes.code !== 0) {
-        throw new Error(mindmapRes.message || '生成失败')
-      }
-
-      // 4. 扣除积分
+      // 3. 扣除积分
       await api.deductPoints(10, '手写笔记转导图')
 
-      this.setData({ loading: false })
+      this.setData({ loadingText: '正在生成导图，请耐心等待...' })
 
-      // 5. 跳转到结果页
-      wx.navigateTo({
-        url: `/pages/result/result?mindmapId=${mindmapRes.data._id}`
-      })
+      // 4. 轮询查询处理状态
+      this.pollResult(recordId)
 
     } catch (err) {
       console.error('生成失败', err)
@@ -171,6 +165,55 @@ Page({
         icon: 'none'
       })
     }
+  },
+
+  // 轮询查询处理结果
+  pollResult(recordId) {
+    let pollCount = 0
+    const maxPoll = 60 // 最多轮询60次（约2分钟）
+
+    this.pollTimer = setInterval(async () => {
+      pollCount++
+
+      if (pollCount > maxPoll) {
+        clearInterval(this.pollTimer)
+        this.setData({ loading: false })
+        wx.showToast({ title: '处理超时，请稍后查看', icon: 'none' })
+        return
+      }
+
+      try {
+        const db = wx.cloud.database()
+        const res = await db.collection('records').doc(recordId).get()
+        const record = res.data
+
+        if (record.status === 'completed') {
+          // 处理完成
+          clearInterval(this.pollTimer)
+          this.setData({ loading: false })
+          this.getUserPoints() // 刷新积分
+          this.loadRecentRecords() // 刷新记录
+
+          wx.navigateTo({
+            url: `/pages/result/result?mindmapId=${recordId}`
+          })
+
+        } else if (record.status === 'failed') {
+          // 处理失败
+          clearInterval(this.pollTimer)
+          this.setData({ loading: false })
+          wx.showToast({ title: '识别失败，请重试', icon: 'none' })
+
+        } else {
+          // 仍在处理中
+          const texts = ['正在识别笔迹...', '正在整理内容...', '正在生成结构...']
+          const textIndex = Math.min(Math.floor(pollCount / 3), texts.length - 1)
+          this.setData({ loadingText: texts[textIndex] })
+        }
+      } catch (err) {
+        console.error('查询状态失败', err)
+      }
+    }, 2000) // 每2秒查询一次
   },
 
   // 查看记录

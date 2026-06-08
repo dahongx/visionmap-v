@@ -11,6 +11,50 @@ exports.main = async (event, context) => {
   const openid = wxContext.OPENID
 
   try {
+    // 1. 先创建记录，状态为"处理中"
+    const db = cloud.database()
+    const recordsCollection = db.collection('records')
+
+    const record = {
+      userId: openid,
+      type: 'image',
+      sourceUrl: fileID,
+      resultJson: null,
+      status: 'processing',
+      pointsCost: 10,
+      createdAt: db.serverDate()
+    }
+
+    const addRes = await recordsCollection.add({
+      data: record
+    })
+
+    const recordId = addRes._id
+
+    // 2. 立即返回记录ID
+    // 后台继续处理AI请求
+    processImageAsync(fileID, openid, recordId)
+
+    return {
+      code: 0,
+      data: {
+        _id: recordId,
+        status: 'processing'
+      }
+    }
+
+  } catch (err) {
+    console.error('创建记录失败', err)
+    return {
+      code: -1,
+      message: err.message || '创建记录失败'
+    }
+  }
+}
+
+// 异步处理图片分析（不受云函数超时限制）
+async function processImageAsync(fileID, openid, recordId) {
+  try {
     // 1. 下载图片
     const fileRes = await cloud.downloadFile({
       fileID
@@ -19,7 +63,7 @@ exports.main = async (event, context) => {
     const imageBuffer = fileRes.fileContent
     const base64Image = imageBuffer.toString('base64')
 
-    // 2. 调用Claude API分析图片
+    // 2. 调用Claude API分析图片（完整提示词，不删减）
     const apiKey = process.env.CLAUDE_API_KEY
     const response = await axios.post(
       'https://token-plan-cn.xiaomimimo.com/anthropic/v1/messages',
@@ -64,20 +108,18 @@ exports.main = async (event, context) => {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
-        }
+        },
+        timeout: 120000
       }
     )
 
     // 3. 解析返回结果
     const content = response.data.content[0].text
 
-    // 尝试提取JSON
     let mindmapData
     try {
-      // 尝试直接解析
       mindmapData = JSON.parse(content)
     } catch (e) {
-      // 如果直接解析失败，尝试提取JSON部分
       const jsonMatch = content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         mindmapData = JSON.parse(jsonMatch[0])
@@ -86,36 +128,27 @@ exports.main = async (event, context) => {
       }
     }
 
-    // 4. 保存到数据库
+    // 4. 更新记录状态为"已完成"
     const db = cloud.database()
-    const recordsCollection = db.collection('records')
-
-    const record = {
-      userId: openid,
-      type: 'image',
-      sourceUrl: fileID,
-      resultJson: mindmapData,
-      pointsCost: 10,
-      createdAt: db.serverDate()
-    }
-
-    const addRes = await recordsCollection.add({
-      data: record
+    await db.collection('records').doc(recordId).update({
+      data: {
+        resultJson: mindmapData,
+        status: 'completed'
+      }
     })
 
-    return {
-      code: 0,
-      data: {
-        _id: addRes._id,
-        ...mindmapData
-      }
-    }
+    console.log('图片分析完成，记录ID:', recordId)
 
   } catch (err) {
-    console.error('图片分析失败', err)
-    return {
-      code: -1,
-      message: err.message || '分析失败'
-    }
+    console.error('异步处理图片失败:', err)
+
+    // 更新记录状态为"失败"
+    const db = cloud.database()
+    await db.collection('records').doc(recordId).update({
+      data: {
+        status: 'failed',
+        error: err.message
+      }
+    })
   }
 }
