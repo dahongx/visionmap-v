@@ -84,6 +84,17 @@ Page({
     })
   },
 
+  // 主按钮点击事件
+  handleMainAction() {
+    if (this.data.tempFilePath) {
+      // 已选择图片，生成导图
+      this.generateMindmap()
+    } else {
+      // 未选择图片，拍照
+      this.chooseImage()
+    }
+  },
+
   // 生成思维导图
   async generateMindmap() {
     if (!this.data.tempFilePath) {

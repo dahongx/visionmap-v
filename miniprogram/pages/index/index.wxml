@@ -43,8 +43,8 @@
 
   <!-- 操作按钮 -->
   <view class="button-area">
-    <button class="btn-main" bindtap="generateMindmap" disabled="{{!tempFilePath || loading}}">
-      {{tempFilePath ? '开始生成导图' : '拍照生成导图'}}
+    <button class="btn-main {{loading ? 'loading' : ''}}" bindtap="handleMainAction" disabled="{{loading}}">
+      {{loading ? loadingText : (tempFilePath ? '开始生成导图' : '拍照生成导图')}}
     </button>
     <button class="btn-sub" bindtap="chooseFromAlbum">从相册选择</button>
   </view>
