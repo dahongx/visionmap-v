@@ -31,9 +31,11 @@ exports.main = async (event, context) => {
 
     const recordId = addRes._id
 
-    // 2. 立即返回记录ID
-    // 后台继续处理AI请求
-    processImageAsync(fileID, openid, recordId)
+    // 2. 立即返回记录ID（不等待异步操作）
+    // 使用 setTimeout 在后台处理AI请求
+    setTimeout(() => {
+      processImageAsync(fileID, openid, recordId)
+    }, 0)
 
     return {
       code: 0,
