@@ -1,5 +1,5 @@
 <view class="container">
-  <!-- 工具栏 -->
+  <!-- 顶部工具栏 -->
   <view class="toolbar">
     <view class="tool-btn" bindtap="zoomIn">
       <text>🔍+</text>
@@ -19,8 +19,8 @@
   </view>
 
   <!-- 思维导图画布 -->
-  <view class="canvas-container" bindtouchstart="onTouchStart" bindtouchmove="onTouchMove" bindtouchend="onTouchEnd">
-    <canvas canvas-id="mindmapCanvas" class="mindmap-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"></canvas>
+  <view class="canvas-container">
+    <canvas canvas-id="mindmapCanvas" class="mindmap-canvas"></canvas>
   </view>
 
   <!-- 底部操作栏 -->

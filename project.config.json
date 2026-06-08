@@ -37,7 +37,7 @@
   "appid": "wx7239482bd0549561",
   "projectname": "思维导图小助手",
   "libVersion": "2.19.4",
-  "cloudfunctionTemplateRoot": "",
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
   "condition": {},
   "description": "图片/文档转思维导图工具"
 }

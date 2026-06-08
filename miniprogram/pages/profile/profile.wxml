@@ -9,35 +9,49 @@
     <button class="login-btn" wx:if="{{!userInfo.nickName}}" bindtap="login">登录</button>
   </view>
 
-  <!-- 积分详情 -->
+  <!-- 积分说明 -->
   <view class="points-section">
-    <view class="points-item">
-      <text class="points-label">今日签到</text>
-      <text class="points-value">+5</text>
+    <view class="points-header">
+      <text class="points-title">当前积分</text>
+      <text class="points-value">{{points}}</text>
     </view>
-    <view class="points-item">
-      <text class="points-label">邀请好友</text>
-      <text class="points-value">+20</text>
-    </view>
-    <view class="points-item">
-      <text class="points-label">购买积分卡</text>
-      <text class="points-value">自定义</text>
+    <view class="points-rule">
+      <text class="rule-text">每次生成消耗 10 积分</text>
     </view>
   </view>
 
   <!-- 功能菜单 -->
   <view class="menu-section">
-    <view class="menu-item" bindtap="inviteFriend">
-      <text class="menu-text">邀请好友</text>
-      <text class="menu-arrow">></text>
-    </view>
     <view class="menu-item" bindtap="signIn">
       <text class="menu-text">每日签到</text>
+      <text class="menu-desc">+5积分</text>
       <text class="menu-arrow">></text>
     </view>
-    <view class="menu-item" bindtap="about">
-      <text class="menu-text">关于我们</text>
+    <view class="menu-item" bindtap="inviteFriend">
+      <text class="menu-text">邀请好友</text>
+      <text class="menu-desc">各得+20积分</text>
       <text class="menu-arrow">></text>
     </view>
+    <view class="menu-item" bindtap="showHistory">
+      <text class="menu-text">生成记录</text>
+      <text class="menu-arrow">></text>
+    </view>
+    <view class="menu-item" bindtap="showHelp">
+      <text class="menu-text">帮助说明</text>
+      <text class="menu-arrow">></text>
+    </view>
+    <view class="menu-item" bindtap="showFAQ">
+      <text class="menu-text">常见问题</text>
+      <text class="menu-arrow">></text>
+    </view>
+    <view class="menu-item" bindtap="feedback">
+      <text class="menu-text">意见反馈</text>
+      <text class="menu-arrow">></text>
+    </view>
+  </view>
+
+  <!-- 底部说明 -->
+  <view class="footer">
+    <text class="footer-text">思维导图小助手 v1.0</text>
   </view>
 </view>

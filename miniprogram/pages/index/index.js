@@ -3,18 +3,21 @@ const api = require('../../utils/api')
 
 Page({
   data: {
-    selectedType: 'mindmap',
     points: 0,
-    pointsCost: 10,
+    tempFilePath: null,
     canGenerate: false,
     loading: false,
     loadingText: '正在分析...',
-    tempFilePath: null,
-    fileType: null
+    recentRecords: []
   },
 
   onLoad() {
     this.getUserPoints()
+    this.loadRecentRecords()
+  },
+
+  onShow() {
+    this.loadRecentRecords()
   },
 
   // 获取用户积分
@@ -29,50 +32,55 @@ Page({
     }
   },
 
-  // 选择图片
+  // 加载最近记录
+  async loadRecentRecords() {
+    try {
+      const res = await api.getRecords(1, 5)
+      this.setData({
+        recentRecords: res.data || []
+      })
+    } catch (err) {
+      console.error('加载记录失败', err)
+    }
+  },
+
+  // 选择图片（拍照）
   chooseImage() {
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
-      sourceType: ['album', 'camera'],
+      sourceType: ['camera'],
       success: (res) => {
         const tempFilePath = res.tempFiles[0].tempFilePath
         this.setData({
           tempFilePath,
-          fileType: 'image',
-          canGenerate: true,
-          pointsCost: 10
+          canGenerate: true
         })
       }
     })
   },
 
-  // 选择文档
-  chooseDocument() {
-    wx.chooseMessageFile({
+  // 从相册选择
+  chooseFromAlbum() {
+    wx.chooseMedia({
       count: 1,
-      type: 'file',
-      extension: ['pdf', 'doc', 'docx'],
+      mediaType: ['image'],
+      sourceType: ['album'],
       success: (res) => {
-        const tempFilePath = res.tempFiles[0].path
-        const fileName = res.tempFiles[0].name
-        const ext = fileName.split('.').pop().toLowerCase()
-
+        const tempFilePath = res.tempFiles[0].tempFilePath
         this.setData({
           tempFilePath,
-          fileType: ext,
-          canGenerate: true,
-          pointsCost: 15
+          canGenerate: true
         })
       }
     })
   },
 
-  // 选择导图类型
-  selectType(e) {
-    const type = e.currentTarget.dataset.type
+  // 清除已选择图片
+  clearImage() {
     this.setData({
-      selectedType: type
+      tempFilePath: null,
+      canGenerate: false
     })
   },
 
@@ -80,13 +88,13 @@ Page({
   async generateMindmap() {
     if (!this.data.tempFilePath) {
       wx.showToast({
-        title: '请先上传文件',
+        title: '请先选择图片',
         icon: 'none'
       })
       return
     }
 
-    if (this.data.points < this.data.pointsCost) {
+    if (this.data.points < 10) {
       wx.showModal({
         title: '积分不足',
         content: '当前积分不足，是否邀请好友获取积分？',
@@ -94,7 +102,9 @@ Page({
         cancelText: '取消',
         success: (res) => {
           if (res.confirm) {
-            // TODO: 跳转到邀请页面
+            wx.switchTab({
+              url: '/pages/profile/profile'
+            })
           }
         }
       })
@@ -103,37 +113,37 @@ Page({
 
     this.setData({
       loading: true,
-      loadingText: '正在上传文件...'
+      loadingText: '正在上传图片...'
     })
 
     try {
-      // 1. 上传文件到云存储
-      const cloudPath = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      // 1. 上传图片到云存储
+      const cloudPath = `uploads/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`
       const uploadRes = await wx.cloud.uploadFile({
-        cloudPath: `uploads/${cloudPath}`,
+        cloudPath,
         filePath: this.data.tempFilePath
       })
 
-      this.setData({ loadingText: '正在分析内容...' })
+      this.setData({ loadingText: '正在识别笔迹...' })
 
-      // 2. 调用云函数分析
-      let analyzeRes
-      if (this.data.fileType === 'image') {
-        analyzeRes = await api.analyzeImage(uploadRes.fileID)
-      } else {
-        analyzeRes = await api.analyzeDocument(uploadRes.fileID, this.data.fileType)
+      // 2. 调用云函数分析图片
+      const analyzeRes = await api.analyzeImage(uploadRes.fileID)
+
+      if (analyzeRes.code !== 0) {
+        throw new Error(analyzeRes.message || '分析失败')
       }
 
-      this.setData({ loadingText: '正在生成思维导图...' })
+      this.setData({ loadingText: '正在生成导图...' })
 
       // 3. 生成思维导图
-      const mindmapRes = await api.generateMindmap(
-        analyzeRes.data,
-        this.data.selectedType
-      )
+      const mindmapRes = await api.generateMindmap(analyzeRes.data, 'mindmap')
+
+      if (mindmapRes.code !== 0) {
+        throw new Error(mindmapRes.message || '生成失败')
+      }
 
       // 4. 扣除积分
-      await api.deductPoints(this.data.pointsCost, `${this.data.fileType}转导图`)
+      await api.deductPoints(10, '手写笔记转导图')
 
       this.setData({ loading: false })
 
@@ -146,9 +156,17 @@ Page({
       console.error('生成失败', err)
       this.setData({ loading: false })
       wx.showToast({
-        title: '生成失败，请重试',
+        title: err.message || '生成失败，请重试',
         icon: 'none'
       })
     }
+  },
+
+  // 查看记录
+  viewRecord(e) {
+    const id = e.currentTarget.dataset.id
+    wx.navigateTo({
+      url: `/pages/result/result?mindmapId=${id}`
+    })
   }
 })

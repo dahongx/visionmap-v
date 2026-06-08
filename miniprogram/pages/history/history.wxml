@@ -1,13 +1,21 @@
 <view class="container">
+  <!-- 顶部标题 -->
   <view class="header">
-    <text class="title">历史记录</text>
+    <text class="title">我的导图</text>
+  </view>
+
+  <!-- 筛选标签 -->
+  <view class="filter-tags">
+    <view class="tag active">全部</view>
+    <view class="tag">最近编辑</view>
+    <view class="tag">已导出</view>
   </view>
 
   <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{records.length === 0}}">
+  <view class="empty-state" wx:if="{{records.length === 0 && !loading}}">
     <view class="empty-icon">📝</view>
-    <text class="empty-text">暂无记录</text>
-    <text class="empty-desc">去首页生成思维导图吧</text>
+    <text class="empty-text">还没有导图记录</text>
+    <text class="empty-desc">去首页拍一张手写笔记吧</text>
   </view>
 
   <!-- 记录列表 -->
@@ -18,11 +26,12 @@
       wx:key="_id"
       bindtap="viewRecord"
       data-id="{{item._id}}">
-      <view class="record-thumb">📄</view>
       <view class="record-info">
-        <text class="record-title">{{item.title || '未命名'}}</text>
-        <text class="record-type">{{item.type === 'image' ? '图片' : '文档'}}转导图</text>
+        <text class="record-title">{{item.title || '未命名导图'}}</text>
         <text class="record-time">{{item.createdAt}}</text>
+      </view>
+      <view class="record-actions">
+        <text class="action-btn">继续编辑</text>
       </view>
     </view>
   </view>
