@@ -10,6 +10,10 @@ exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext.OPENID
 
+  console.log('=== analyze-image 开始 ===')
+  console.log('fileID:', fileID)
+  console.log('openid:', openid)
+
   try {
     // 1. 先创建记录，状态为"处理中"
     const db = cloud.database()
@@ -25,11 +29,13 @@ exports.main = async (event, context) => {
       createdAt: db.serverDate()
     }
 
+    console.log('正在创建记录...')
     const addRes = await recordsCollection.add({
       data: record
     })
 
     const recordId = addRes._id
+    console.log('记录创建成功，recordId:', recordId)
 
     // 2. 立即返回记录ID（不等待异步操作）
     // 使用 setTimeout 在后台处理AI请求
@@ -37,6 +43,7 @@ exports.main = async (event, context) => {
       processImageAsync(fileID, openid, recordId)
     }, 0)
 
+    console.log('=== analyze-image 返回 ===')
     return {
       code: 0,
       data: {
@@ -46,7 +53,7 @@ exports.main = async (event, context) => {
     }
 
   } catch (err) {
-    console.error('创建记录失败', err)
+    console.error('创建记录失败:', err)
     return {
       code: -1,
       message: err.message || '创建记录失败'
@@ -56,17 +63,26 @@ exports.main = async (event, context) => {
 
 // 异步处理图片分析（不受云函数超时限制）
 async function processImageAsync(fileID, openid, recordId) {
+  console.log('=== processImageAsync 开始 ===')
+  console.log('fileID:', fileID)
+  console.log('recordId:', recordId)
+
   try {
     // 1. 下载图片
+    console.log('正在下载图片...')
     const fileRes = await cloud.downloadFile({
       fileID
     })
 
     const imageBuffer = fileRes.fileContent
     const base64Image = imageBuffer.toString('base64')
+    console.log('图片下载成功，大小:', imageBuffer.length, 'bytes')
 
-    // 2. 调用Claude API分析图片（完整提示词，不删减）
+// 2. 调用Claude API分析图片（完整提示词，不删减）
     const apiKey = process.env.CLAUDE_API_KEY
+    console.log('API Key存在:', !!apiKey)
+    console.log('正在调用AI API...')
+    const startTime = Date.now()
     const response = await axios.post(
       'https://token-plan-cn.xiaomimimo.com/anthropic/v1/messages',
       {
@@ -105,7 +121,7 @@ async function processImageAsync(fileID, openid, recordId) {
           ]
         }]
       },
-      {
+{
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
@@ -115,8 +131,12 @@ async function processImageAsync(fileID, openid, recordId) {
       }
     )
 
+    const apiTime = Date.now() - startTime
+    console.log('AI API调用完成，耗时:', apiTime, 'ms')
+
     // 3. 解析返回结果
     const content = response.data.content[0].text
+    console.log('AI返回内容长度:', content.length)
 
     let mindmapData
     try {
