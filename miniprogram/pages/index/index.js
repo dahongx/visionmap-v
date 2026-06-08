@@ -175,27 +175,9 @@ Page({
   // 轮询查询处理结果
   pollResult(recordId) {
     let pollCount = 0
-    const maxPoll = 120 // 最多轮询120次（约4分钟）
 
     this.pollTimer = setInterval(async () => {
       pollCount++
-
-      if (pollCount > maxPoll) {
-        clearInterval(this.pollTimer)
-        this.setData({ loading: false })
-        wx.showModal({
-          title: '处理时间较长',
-          content: '图片识别需要一些时间，是否继续等待？',
-          confirmText: '继续等待',
-          cancelText: '取消',
-          success: (res) => {
-            if (res.confirm) {
-              this.pollResult(recordId)
-            }
-          }
-        })
-        return
-      }
 
       try {
         const db = wx.cloud.database()
@@ -220,8 +202,8 @@ Page({
           wx.showToast({ title: '识别失败，请重试', icon: 'none' })
 
         } else {
-          // 仍在处理中
-          const texts = ['正在识别笔迹...', '正在整理内容...', '正在生成结构...', '识别较复杂的手写内容需要更多时间，请耐心等待...']
+          // 仍在处理中，继续等待
+          const texts = ['正在识别笔迹...', '正在整理内容...', '正在生成结构...', '手写内容识别中，请耐心等待...']
           const textIndex = Math.min(Math.floor(pollCount / 10), texts.length - 1)
           this.setData({ loadingText: texts[textIndex] })
         }
