@@ -13,6 +13,50 @@ exports.main = async (event, context) => {
   const openid = wxContext.OPENID
 
   try {
+    // 1. 先创建记录，状态为"处理中"
+    const db = cloud.database()
+    const recordsCollection = db.collection('records')
+
+    const record = {
+      userId: openid,
+      type: fileType,
+      sourceUrl: fileID,
+      resultJson: null,
+      status: 'processing',
+      pointsCost: 15,
+      createdAt: db.serverDate()
+    }
+
+    const addRes = await recordsCollection.add({
+      data: record
+    })
+
+    const recordId = addRes._id
+
+    // 2. 立即返回记录ID
+    // 后台继续处理AI请求
+    processDocumentAsync(fileID, fileType, openid, recordId)
+
+    return {
+      code: 0,
+      data: {
+        _id: recordId,
+        status: 'processing'
+      }
+    }
+
+  } catch (err) {
+    console.error('创建记录失败', err)
+    return {
+      code: -1,
+      message: err.message || '创建记录失败'
+    }
+  }
+}
+
+// 异步处理文档分析
+async function processDocumentAsync(fileID, fileType, openid, recordId) {
+  try {
     // 1. 下载文件
     const fileRes = await cloud.downloadFile({
       fileID
@@ -67,7 +111,8 @@ ${textContent.substring(0, 8000)}
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
-        }
+        },
+        timeout: 120000
       }
     )
 
@@ -86,36 +131,27 @@ ${textContent.substring(0, 8000)}
       }
     }
 
-    // 5. 保存到数据库
+    // 5. 更新记录状态为"已完成"
     const db = cloud.database()
-    const recordsCollection = db.collection('records')
-
-    const record = {
-      userId: openid,
-      type: fileType,
-      sourceUrl: fileID,
-      resultJson: mindmapData,
-      pointsCost: 15,
-      createdAt: db.serverDate()
-    }
-
-    const addRes = await recordsCollection.add({
-      data: record
+    await db.collection('records').doc(recordId).update({
+      data: {
+        resultJson: mindmapData,
+        status: 'completed'
+      }
     })
 
-    return {
-      code: 0,
-      data: {
-        _id: addRes._id,
-        ...mindmapData
-      }
-    }
+    console.log('文档分析完成，记录ID:', recordId)
 
   } catch (err) {
-    console.error('文档分析失败', err)
-    return {
-      code: -1,
-      message: err.message || '分析失败'
-    }
+    console.error('异步处理文档失败:', err)
+
+    // 更新记录状态为"失败"
+    const db = cloud.database()
+    await db.collection('records').doc(recordId).update({
+      data: {
+        status: 'failed',
+        error: err.message
+      }
+    })
   }
 }
