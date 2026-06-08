@@ -93,6 +93,15 @@ const updateUserInfo = async (userInfo) => {
   return res.result
 }
 
+// 查询记录状态
+const getRecord = async (recordId) => {
+  const res = await wx.cloud.callFunction({
+    name: 'get-record',
+    data: { recordId }
+  })
+  return res.result
+}
+
 module.exports = {
   getUserPoints,
   deductPoints,
@@ -103,5 +112,6 @@ module.exports = {
   generateMindmap,
   getMindmap,
   getRecords,
-  updateUserInfo
+  updateUserInfo,
+  getRecord
 }

@@ -180,8 +180,14 @@ Page({
       pollCount++
 
       try {
-        const db = wx.cloud.database()
-        const res = await db.collection('records').doc(recordId).get()
+        // 使用云函数查询记录状态
+        const res = await api.getRecord(recordId)
+
+        if (res.code !== 0) {
+          console.error('查询失败:', res.message)
+          return
+        }
+
         const record = res.data
 
         if (record.status === 'completed') {
