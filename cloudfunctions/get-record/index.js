@@ -5,7 +5,7 @@ cloud.init({
 })
 
 exports.main = async (event, context) => {
-  const { action = 'detail', recordId, page = 1, pageSize = 10 } = event
+  const { action = 'detail', recordId, page = 1, pageSize = 10, mindmapData } = event
   const wxContext = cloud.getWXContext()
   const openid = wxContext.OPENID
 
@@ -56,6 +56,29 @@ exports.main = async (event, context) => {
       }
     }
 
+    if (action === 'update') {
+      if (!mindmapData || typeof mindmapData !== 'object') {
+        return {
+          code: -1,
+          message: '导图数据为空'
+        }
+      }
+
+      const _ = db.command
+      await recordsCollection.doc(recordId).update({
+        data: {
+          title: getMindmapTitle(mindmapData),
+          resultJson: _.set(mindmapData),
+          updatedAt: db.serverDate()
+        }
+      })
+
+      return {
+        code: 0,
+        message: '保存成功'
+      }
+    }
+
     return {
       code: 0,
       data: formatRecordForClient(record)
@@ -84,8 +107,9 @@ function formatRecordForClient(record) {
 }
 
 function getRecordTitle(record) {
-  if (record.resultJson && record.resultJson.text) {
-    return record.resultJson.text
+  const title = getMindmapTitle(record.resultJson)
+  if (title) {
+    return title
   }
 
   if (record.status === 'processing') {
@@ -97,6 +121,14 @@ function getRecordTitle(record) {
   }
 
   return '未命名导图'
+}
+
+function getMindmapTitle(mindmapData) {
+  if (mindmapData && typeof mindmapData.text === 'string' && mindmapData.text.trim()) {
+    return mindmapData.text.trim()
+  }
+
+  return ''
 }
 
 function formatDate(value) {

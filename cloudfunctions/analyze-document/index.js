@@ -28,6 +28,7 @@ exports.main = async (event, context) => {
 
   try {
     const db = cloud.database()
+    const _ = db.command
     const recordsCollection = db.collection('records')
 
     const addRes = await recordsCollection.add({
@@ -36,7 +37,7 @@ exports.main = async (event, context) => {
         type: fileType,
         sourceUrl: fileID,
         title: '文档识别中',
-        resultJson: null,
+        resultJson: {},
         status: 'processing',
         pointsCost: 15,
         createdAt: db.serverDate()
@@ -51,7 +52,7 @@ exports.main = async (event, context) => {
       await recordsCollection.doc(recordId).update({
         data: {
           title: mindmapData.text || '未命名导图',
-          resultJson: mindmapData,
+          resultJson: _.set(mindmapData),
           status: 'completed',
           completedAt: db.serverDate()
         }
@@ -146,7 +147,7 @@ ${textContent.substring(0, 8000)}
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      timeout: 120000
+      timeout: 45000
     }
   )
 

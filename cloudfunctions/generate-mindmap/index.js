@@ -18,6 +18,7 @@ exports.main = async (event, context) => {
 
     // 2. 保存到数据库
     const db = cloud.database()
+    const _ = db.command
     const recordsCollection = db.collection('records')
 
     // 查找最新记录并更新
@@ -31,7 +32,7 @@ exports.main = async (event, context) => {
       const recordId = recordRes.data[0]._id
       await recordsCollection.doc(recordId).update({
         data: {
-          resultJson: optimizedData,
+          resultJson: _.set(optimizedData),
           mapType: mapType
         }
       })

@@ -23,6 +23,7 @@ exports.main = async (event, context) => {
 
   try {
     const db = cloud.database()
+    const _ = db.command
     const recordsCollection = db.collection('records')
 
     const addRes = await recordsCollection.add({
@@ -31,7 +32,7 @@ exports.main = async (event, context) => {
         type: 'image',
         sourceUrl: fileID,
         title: '图片识别中',
-        resultJson: null,
+        resultJson: {},
         status: 'processing',
         pointsCost: 10,
         createdAt: db.serverDate()
@@ -44,19 +45,12 @@ exports.main = async (event, context) => {
     try {
       const mindmapData = await processImage(fileID)
 
-      // 先删除resultJson字段，再添加新的值
       await recordsCollection.doc(recordId).update({
         data: {
           title: mindmapData.text || '未命名导图',
+          resultJson: _.set(mindmapData),
           status: 'completed',
           completedAt: db.serverDate()
-        }
-      })
-
-      // 重新设置resultJson字段
-      await recordsCollection.doc(recordId).update({
-        data: {
-          resultJson: mindmapData
         }
       })
 
@@ -159,7 +153,7 @@ async function processImage(fileID) {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      timeout: 120000
+      timeout: 45000
     }
   )
 

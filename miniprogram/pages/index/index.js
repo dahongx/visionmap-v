@@ -13,6 +13,7 @@ Page({
 
   // 轮询定时器
   pollTimer: null,
+  recordsLoading: false,
 
   onLoad() {
     this.getUserPoints()
@@ -20,6 +21,7 @@ Page({
   },
 
   onShow() {
+    if (this.data.recentRecords.length > 0) return
     this.loadRecentRecords()
   },
 
@@ -46,6 +48,9 @@ Page({
 
   // 加载最近记录
   async loadRecentRecords() {
+    if (this.recordsLoading) return
+    this.recordsLoading = true
+
     try {
       const res = await api.getRecords(1, 5)
       if (!res || res.code !== 0) {
@@ -57,6 +62,8 @@ Page({
       })
     } catch (err) {
       console.error('加载记录失败', err)
+    } finally {
+      this.recordsLoading = false
     }
   },
 

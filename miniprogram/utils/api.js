@@ -3,108 +3,85 @@
  * 统一封装云函数调用
  */
 
+const callCloudFunction = async (name, data = {}) => {
+  console.log(`[cloud] call ${name}`, data)
+  try {
+    const res = await wx.cloud.callFunction({
+      name,
+      data
+    })
+    console.log(`[cloud] success ${name}`, res.result)
+    return res.result
+  } catch (err) {
+    console.error(`[cloud] fail ${name}`, err)
+    throw err
+  }
+}
+
 // 获取用户积分
 const getUserPoints = async () => {
-  const res = await wx.cloud.callFunction({
-    name: 'user-points',
-    data: { action: 'get' }
-  })
-  return res.result
+  return callCloudFunction('user-points', { action: 'get' })
 }
 
 // 扣除积分
 const deductPoints = async (points, reason) => {
-  const res = await wx.cloud.callFunction({
-    name: 'user-points',
-    data: { action: 'deduct', points, reason }
-  })
-  return res.result
+  return callCloudFunction('user-points', { action: 'deduct', points, reason })
 }
 
 // 增加积分
 const addPoints = async (points, reason) => {
-  const res = await wx.cloud.callFunction({
-    name: 'user-points',
-    data: { action: 'add', points, reason }
-  })
-  return res.result
+  return callCloudFunction('user-points', { action: 'add', points, reason })
 }
 
 // 每日签到
 const signIn = async () => {
-  const res = await wx.cloud.callFunction({
-    name: 'user-points',
-    data: { action: 'signIn' }
-  })
-  return res.result
+  return callCloudFunction('user-points', { action: 'signIn' })
 }
 
 // 分析图片
 const analyzeImage = async (fileID) => {
-  const res = await wx.cloud.callFunction({
-    name: 'analyze-image',
-    data: { fileID }
-  })
-  return res.result
+  return callCloudFunction('analyze-image', { fileID })
 }
 
 // 分析文档
 const analyzeDocument = async (fileID, fileType) => {
-  const res = await wx.cloud.callFunction({
-    name: 'analyze-document',
-    data: { fileID, fileType }
-  })
-  return res.result
+  return callCloudFunction('analyze-document', { fileID, fileType })
 }
 
 // 生成思维导图
 const generateMindmap = async (data, mapType) => {
-  const res = await wx.cloud.callFunction({
-    name: 'generate-mindmap',
-    data: { mindmapData: data, mapType }
-  })
-  return res.result
+  return callCloudFunction('generate-mindmap', { mindmapData: data, mapType })
 }
 
 // 获取思维导图
 const getMindmap = async (mindmapId) => {
-  const res = await wx.cloud.callFunction({
-    name: 'get-record',
-    data: { action: 'detail', recordId: mindmapId }
-  })
+  const result = await callCloudFunction('get-record', { action: 'detail', recordId: mindmapId })
 
-  if (res.result && res.result.code === 0) {
-    return res.result.data
+  if (result && result.code === 0) {
+    return result.data
   }
 
-  throw new Error((res.result && res.result.message) || '获取导图失败')
+  throw new Error((result && result.message) || '获取导图失败')
 }
 
 // 获取记录列表
 const getRecords = async (page = 1, pageSize = 10) => {
-  const res = await wx.cloud.callFunction({
-    name: 'get-record',
-    data: { action: 'list', page, pageSize }
-  })
-  return res.result
+  return callCloudFunction('get-record', { action: 'list', page, pageSize })
 }
 
 // 更新用户信息
 const updateUserInfo = async (userInfo) => {
-  const res = await wx.cloud.callFunction({
-    name: 'user-points',
-    data: { action: 'updateUserInfo', userInfo }
-  })
-  return res.result
+  return callCloudFunction('user-points', { action: 'updateUserInfo', userInfo })
 }
 
 // 查询记录状态
 const getRecord = async (recordId) => {
-  const res = await wx.cloud.callFunction({
-    name: 'get-record',
-    data: { action: 'detail', recordId }
-  })
-  return res.result
+  return callCloudFunction('get-record', { action: 'detail', recordId })
+}
+
+// 保存思维导图
+const updateMindmap = async (recordId, mindmapData) => {
+  return callCloudFunction('get-record', { action: 'update', recordId, mindmapData })
 }
 
 module.exports = {
@@ -118,5 +95,6 @@ module.exports = {
   getMindmap,
   getRecords,
   updateUserInfo,
-  getRecord
+  getRecord,
+  updateMindmap
 }

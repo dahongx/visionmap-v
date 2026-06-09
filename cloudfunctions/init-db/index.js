@@ -16,7 +16,7 @@ exports.main = async (event, context) => {
         await db.createCollection(collectionName)
         console.log(`集合 ${collectionName} 创建成功`)
       } catch (err) {
-        if (err.errCode === -502005) {
+        if (isCollectionExistsError(err)) {
           console.log(`集合 ${collectionName} 已存在`)
         } else {
           throw err
@@ -36,4 +36,15 @@ exports.main = async (event, context) => {
       message: err.message
     }
   }
+}
+
+function isCollectionExistsError(err) {
+  const message = err.errMsg || err.message || ''
+  return (
+    err.errCode === -502005 ||
+    err.errCode === -501001 ||
+    message.includes('ResourceExist') ||
+    message.includes('Table exist') ||
+    message.includes('DATABASE_COLLECTION_ALREADY_EXIST')
+  )
 }
