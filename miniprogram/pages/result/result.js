@@ -859,9 +859,13 @@ Page({
   saveExportedImage(filePath) {
     wx.saveImageToPhotosAlbum({
       filePath,
-      success: () => {
+      success: async () => {
         wx.hideLoading()
-        wx.showToast({ title: '已保存到相册', icon: 'success' })
+        const synced = await this.markCurrentRecordExported()
+        wx.showToast({
+          title: synced ? '已保存到相册' : '图片已保存，状态未同步',
+          icon: synced ? 'success' : 'none'
+        })
       },
       fail: (err) => {
         wx.hideLoading()
@@ -879,6 +883,21 @@ Page({
         }
       }
     })
+  },
+
+  async markCurrentRecordExported() {
+    if (!this.data.mindmapId) return
+
+    try {
+      const res = await api.markMindmapExported(this.data.mindmapId)
+      if (!res || res.code !== 0 || res.exported !== true) {
+        throw new Error((res && res.message) || '导出状态未写入')
+      }
+      return true
+    } catch (err) {
+      console.error('标记导出状态失败', err)
+      return false
+    }
   },
 
   exportPDF() {

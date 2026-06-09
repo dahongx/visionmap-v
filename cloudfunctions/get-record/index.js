@@ -5,7 +5,7 @@ cloud.init({
 })
 
 exports.main = async (event, context) => {
-  const { action = 'detail', recordId, page = 1, pageSize = 10, mindmapData } = event
+  const { action = 'detail', recordId, page = 1, pageSize = 10, mindmapData, filter = 'all' } = event
   const wxContext = cloud.getWXContext()
   const openid = wxContext.OPENID
 
@@ -16,18 +16,30 @@ exports.main = async (event, context) => {
     if (action === 'list') {
       const currentPage = Math.max(Number(page) || 1, 1)
       const currentPageSize = Math.min(Math.max(Number(pageSize) || 10, 1), 50)
+      const _ = db.command
+      const query = { userId: openid }
+
+      if (filter === 'edited') {
+        query.updatedAt = _.exists(true)
+      } else if (filter === 'exported') {
+        query.isExported = true
+      }
+
+      const orderField = filter === 'edited' ? 'updatedAt' : (filter === 'exported' ? 'exportedAt' : 'createdAt')
       const res = await recordsCollection
-        .where({ userId: openid })
-        .orderBy('createdAt', 'desc')
+        .where(query)
+        .orderBy(orderField, 'desc')
         .skip((currentPage - 1) * currentPageSize)
         .limit(currentPageSize)
         .get()
 
       return {
         code: 0,
+        action: 'list',
         data: res.data.map(formatRecordForClient),
         page: currentPage,
         pageSize: currentPageSize,
+        filter,
         hasMore: res.data.length >= currentPageSize
       }
     }
@@ -75,7 +87,38 @@ exports.main = async (event, context) => {
 
       return {
         code: 0,
+        action: 'update',
+        updated: true,
         message: '保存成功'
+      }
+    }
+
+    if (action === 'markExported') {
+      const _ = db.command
+      await recordsCollection.doc(recordId).update({
+        data: {
+          isExported: true,
+          exportedAt: db.serverDate(),
+          exportCount: _.inc(1)
+        }
+      })
+
+      return {
+        code: 0,
+        action: 'markExported',
+        exported: true,
+        message: '已标记导出'
+      }
+    }
+
+    if (action === 'delete') {
+      await recordsCollection.doc(recordId).remove()
+
+      return {
+        code: 0,
+        action: 'delete',
+        deleted: true,
+        message: '删除成功'
       }
     }
 
@@ -95,14 +138,20 @@ exports.main = async (event, context) => {
 function formatRecordForClient(record) {
   const createdAtText = formatDate(record.createdAt)
   const completedAtText = formatDate(record.completedAt)
+  const updatedAtText = formatDate(record.updatedAt)
+  const exportedAtText = formatDate(record.exportedAt)
 
   return {
     ...record,
     title: record.title || getRecordTitle(record),
     createdAt: createdAtText || record.createdAt,
     completedAt: completedAtText || record.completedAt,
+    updatedAt: updatedAtText || record.updatedAt,
+    exportedAt: exportedAtText || record.exportedAt,
     createdAtText,
-    completedAtText
+    completedAtText,
+    updatedAtText,
+    exportedAtText
   }
 }
 

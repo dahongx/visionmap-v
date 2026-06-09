@@ -65,8 +65,8 @@ const getMindmap = async (mindmapId) => {
 }
 
 // 获取记录列表
-const getRecords = async (page = 1, pageSize = 10) => {
-  return callCloudFunction('get-record', { action: 'list', page, pageSize })
+const getRecords = async (page = 1, pageSize = 10, filter = 'all') => {
+  return callCloudFunction('get-record', { action: 'list', page, pageSize, filter })
 }
 
 // 更新用户信息
@@ -84,6 +84,16 @@ const updateMindmap = async (recordId, mindmapData) => {
   return callCloudFunction('get-record', { action: 'update', recordId, mindmapData })
 }
 
+// 标记已导出
+const markMindmapExported = async (recordId) => {
+  return callCloudFunction('get-record', { action: 'markExported', recordId })
+}
+
+// 删除记录
+const deleteRecord = async (recordId) => {
+  return callCloudFunction('get-record', { action: 'delete', recordId })
+}
+
 module.exports = {
   getUserPoints,
   deductPoints,
@@ -96,5 +106,7 @@ module.exports = {
   getRecords,
   updateUserInfo,
   getRecord,
-  updateMindmap
+  updateMindmap,
+  markMindmapExported,
+  deleteRecord
 }

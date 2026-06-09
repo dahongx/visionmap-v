@@ -29,10 +29,12 @@
   border-radius: 20rpx;
   font-size: 26rpx;
   color: #666;
+  border: 1rpx solid transparent;
 }
 
 .tag.active {
   background: #667eea;
+  border-color: #667eea;
   color: white;
 }
 
@@ -70,7 +72,7 @@
 .record-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 30rpx;
   border-bottom: 1rpx solid #f0f0f0;
 }
@@ -91,22 +93,70 @@
   display: block;
   font-size: 30rpx;
   color: #333;
-  margin-bottom: 8rpx;
+  margin-bottom: 12rpx;
+  line-height: 1.4;
 }
 
 .record-time {
-  display: block;
   font-size: 24rpx;
   color: #999;
 }
 
+.record-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.status-tag {
+  height: 34rpx;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10rpx;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+  color: #667085;
+  background: #f2f4f7;
+}
+
+.status-tag.completed {
+  color: #047857;
+  background: #ecfdf3;
+}
+
+.status-tag.failed {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.status-tag.processing {
+  color: #175cd3;
+  background: #eff4ff;
+}
+
+.status-tag.exported {
+  color: #6941c6;
+  background: #f4f3ff;
+}
+
 .record-actions {
   margin-left: 20rpx;
+  min-width: 120rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 18rpx;
 }
 
 .action-btn {
   font-size: 26rpx;
   color: #667eea;
+}
+
+.delete-btn {
+  font-size: 24rpx;
+  color: #c24141;
 }
 
 /* 加载提示 */

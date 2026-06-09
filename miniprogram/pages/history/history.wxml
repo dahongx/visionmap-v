@@ -6,16 +6,16 @@
 
   <!-- 筛选标签 -->
   <view class="filter-tags">
-    <view class="tag active">全部</view>
-    <view class="tag">最近编辑</view>
-    <view class="tag">已导出</view>
+    <view class="tag {{activeFilter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="changeFilter">全部</view>
+    <view class="tag {{activeFilter === 'edited' ? 'active' : ''}}" data-filter="edited" bindtap="changeFilter">最近编辑</view>
+    <view class="tag {{activeFilter === 'exported' ? 'active' : ''}}" data-filter="exported" bindtap="changeFilter">已导出</view>
   </view>
 
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{records.length === 0 && !loading}}">
     <view class="empty-icon">📝</view>
-    <text class="empty-text">还没有导图记录</text>
-    <text class="empty-desc">去首页拍一张手写笔记吧</text>
+    <text class="empty-text">{{emptyText}}</text>
+    <text class="empty-desc">{{emptyDesc}}</text>
   </view>
 
   <!-- 记录列表 -->
@@ -25,13 +25,23 @@
       wx:for="{{records}}"
       wx:key="_id"
       bindtap="viewRecord"
-      data-id="{{item._id}}">
+      data-id="{{item._id}}"
+      data-status="{{item.status}}">
       <view class="record-info">
         <text class="record-title">{{item.title || '未命名导图'}}</text>
-        <text class="record-time">{{item.createdAt}}</text>
+        <view class="record-meta">
+          <text class="status-tag {{item.status}}">{{item.status === 'completed' ? '已生成' : (item.status === 'failed' ? '失败' : '处理中')}}</text>
+          <text class="status-tag exported" wx:if="{{item.isExported}}">已导出</text>
+          <text class="record-time">{{activeFilter === 'edited' ? (item.updatedAtText || item.createdAt) : (activeFilter === 'exported' ? (item.exportedAtText || item.createdAt) : item.createdAt)}}</text>
+        </view>
       </view>
       <view class="record-actions">
-        <text class="action-btn">继续编辑</text>
+        <text class="action-btn">{{item.status === 'failed' ? '查看失败' : '继续编辑'}}</text>
+        <text
+          class="delete-btn"
+          catchtap="deleteRecord"
+          data-id="{{item._id}}"
+          data-title="{{item.title || '未命名导图'}}">删除</text>
       </view>
     </view>
   </view>
