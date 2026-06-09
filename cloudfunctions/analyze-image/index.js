@@ -78,11 +78,12 @@ async function processImageAsync(fileID, openid, recordId) {
     const base64Image = imageBuffer.toString('base64')
     console.log('图片下载成功，大小:', imageBuffer.length, 'bytes')
 
-// 2. 调用Claude API分析图片（完整提示词，不删减）
+    // 2. 调用Claude API分析图片
     const apiKey = process.env.CLAUDE_API_KEY
     console.log('API Key存在:', !!apiKey)
     console.log('正在调用AI API...')
     const startTime = Date.now()
+
     const response = await axios.post(
       'https://token-plan-cn.xiaomimimo.com/anthropic/v1/messages',
       {
@@ -121,7 +122,7 @@ async function processImageAsync(fileID, openid, recordId) {
           ]
         }]
       },
-{
+      {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
@@ -162,7 +163,8 @@ async function processImageAsync(fileID, openid, recordId) {
     console.log('图片分析完成，记录ID:', recordId)
 
   } catch (err) {
-    console.error('异步处理图片失败:', err)
+    console.error('异步处理图片失败:', err.message)
+    console.error('错误堆栈:', err.stack)
 
     // 更新记录状态为"失败"
     const db = cloud.database()
