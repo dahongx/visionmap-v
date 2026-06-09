@@ -14,44 +14,81 @@ exports.main = async (event, context) => {
   console.log('fileID:', fileID)
   console.log('openid:', openid)
 
+  if (!fileID) {
+    return {
+      code: -1,
+      message: '缺少图片文件ID'
+    }
+  }
+
   try {
-    // 1. 先创建记录，状态为"处理中"
     const db = cloud.database()
     const recordsCollection = db.collection('records')
 
-    const record = {
-      userId: openid,
-      type: 'image',
-      sourceUrl: fileID,
-      resultJson: null,
-      status: 'processing',
-      pointsCost: 10,
-      createdAt: db.serverDate()
-    }
-
-    console.log('正在创建记录...')
     const addRes = await recordsCollection.add({
-      data: record
+      data: {
+        userId: openid,
+        type: 'image',
+        sourceUrl: fileID,
+        title: '图片识别中',
+        resultJson: null,
+        status: 'processing',
+        pointsCost: 10,
+        createdAt: db.serverDate()
+      }
     })
 
     const recordId = addRes._id
     console.log('记录创建成功，recordId:', recordId)
 
-    // 2. 立即返回记录ID（不等待异步操作）
-    // 使用 setTimeout 在后台处理AI请求
-    setTimeout(() => {
-      processImageAsync(fileID, openid, recordId)
-    }, 100)
+    try {
+      const mindmapData = await processImage(fileID)
 
-    console.log('=== analyze-image 返回 ===')
-    return {
-      code: 0,
-      data: {
-        _id: recordId,
-        status: 'processing'
+      // 先删除resultJson字段，再添加新的值
+      await recordsCollection.doc(recordId).update({
+        data: {
+          title: mindmapData.text || '未命名导图',
+          status: 'completed',
+          completedAt: db.serverDate()
+        }
+      })
+
+      // 重新设置resultJson字段
+      await recordsCollection.doc(recordId).update({
+        data: {
+          resultJson: mindmapData
+        }
+      })
+
+      console.log('图片分析完成，记录ID:', recordId)
+      return {
+        code: 0,
+        data: {
+          _id: recordId,
+          status: 'completed',
+          resultJson: mindmapData
+        }
+      }
+    } catch (processErr) {
+      console.error('处理图片失败:', processErr)
+
+      await recordsCollection.doc(recordId).update({
+        data: {
+          status: 'failed',
+          error: processErr.message || '图片分析失败',
+          completedAt: db.serverDate()
+        }
+      })
+
+      return {
+        code: -1,
+        message: processErr.message || '图片分析失败',
+        data: {
+          _id: recordId,
+          status: 'failed'
+        }
       }
     }
-
   } catch (err) {
     console.error('创建记录失败:', err)
     return {
@@ -61,48 +98,42 @@ exports.main = async (event, context) => {
   }
 }
 
-// 异步处理图片分析（不受云函数超时限制）
-async function processImageAsync(fileID, openid, recordId) {
-  console.log('=== processImageAsync 开始 ===')
-  console.log('fileID:', fileID)
-  console.log('recordId:', recordId)
+async function processImage(fileID) {
+  const apiKey = process.env.CLAUDE_API_KEY
+  if (!apiKey) {
+    throw new Error('未配置 CLAUDE_API_KEY 环境变量')
+  }
 
-  try {
-    // 1. 下载图片
-    console.log('正在下载图片...')
-    const fileRes = await cloud.downloadFile({
-      fileID
-    })
+  console.log('正在下载图片...')
+  const fileRes = await cloud.downloadFile({
+    fileID
+  })
 
-    const imageBuffer = fileRes.fileContent
-    const base64Image = imageBuffer.toString('base64')
-    console.log('图片下载成功，大小:', imageBuffer.length, 'bytes')
+  const imageBuffer = fileRes.fileContent
+  const base64Image = imageBuffer.toString('base64')
+  console.log('图片下载成功，大小:', imageBuffer.length, 'bytes')
 
-    // 2. 调用Claude API分析图片
-    const apiKey = process.env.CLAUDE_API_KEY
-    console.log('API Key存在:', !!apiKey)
-    console.log('正在调用AI API...')
-    const startTime = Date.now()
-
-    const response = await axios.post(
-      'https://token-plan-cn.xiaomimimo.com/anthropic/v1/messages',
-      {
-        model: 'mimo-v2.5',
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: base64Image
-              }
-            },
-            {
-              type: 'text',
-              text: `请分析这张图片的内容，并将其转换为结构化的思维导图数据格式。
+  console.log('正在调用AI API...')
+  const startTime = Date.now()
+  const response = await axios.post(
+    'https://token-plan-cn.xiaomimimo.com/anthropic/v1/messages',
+    {
+      model: 'mimo-v2.5',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/jpeg',
+              data: base64Image
+            }
+          },
+          {
+            type: 'text',
+            text: `请分析这张图片的内容，并将其转换为结构化的思维导图数据格式。
 
 要求：
 1. 识别图片中的主要内容和层级关系
@@ -118,61 +149,57 @@ async function processImageAsync(fileID, openid, recordId) {
 }
 3. 层级关系要清晰，每个节点都要有text字段
 4. 不要添加额外的解释，只输出JSON`
-            }
-          ]
-        }]
+          }
+        ]
+      }]
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
       },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        timeout: 120000
-      }
-    )
+      timeout: 120000
+    }
+  )
 
-    const apiTime = Date.now() - startTime
-    console.log('AI API调用完成，耗时:', apiTime, 'ms')
+  const apiTime = Date.now() - startTime
+  console.log('AI API调用完成，耗时:', apiTime, 'ms')
 
-    // 3. 解析返回结果
-    const content = response.data.content[0].text
-    console.log('AI返回内容长度:', content.length)
+  const content = response.data.content[0].text
+  console.log('AI返回内容长度:', content.length)
 
-    let mindmapData
-    try {
-      mindmapData = JSON.parse(content)
-    } catch (e) {
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        mindmapData = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error('无法解析AI返回的数据')
-      }
+  return normalizeMindmapData(parseMindmapJson(content))
+}
+
+function parseMindmapJson(content) {
+  try {
+    return JSON.parse(content)
+  } catch (e) {
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0])
+    }
+    throw new Error('无法解析AI返回的数据')
+  }
+}
+
+function normalizeMindmapData(data) {
+  const ensureNode = (node, index = 0) => {
+    const normalized = node && typeof node === 'object' ? node : {}
+    normalized.id = normalized.id || `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${index}`
+    normalized.text = normalized.text || '未命名'
+
+    if (!Array.isArray(normalized.children)) {
+      normalized.children = []
     }
 
-    // 4. 更新记录状态为"已完成"
-    const db = cloud.database()
-    await db.collection('records').doc(recordId).update({
-      data: {
-        resultJson: mindmapData,
-        status: 'completed'
-      }
+    normalized.children = normalized.children.map((child, childIndex) => {
+      return ensureNode(child, childIndex)
     })
 
-    console.log('图片分析完成，记录ID:', recordId)
-
-  } catch (err) {
-    console.error('异步处理图片失败:', err.message)
-    console.error('错误堆栈:', err.stack)
-
-    // 更新记录状态为"失败"
-    const db = cloud.database()
-    await db.collection('records').doc(recordId).update({
-      data: {
-        status: 'failed',
-        error: err.message
-      }
-    })
+    return normalized
   }
+
+  return ensureNode(data)
 }

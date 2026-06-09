@@ -9,29 +9,39 @@ Page({
   },
 
   onLoad() {
-    this.loadRecords()
+    this.refreshRecords()
   },
 
   onShow() {
-    this.loadRecords()
+    this.refreshRecords()
   },
 
   // 加载记录
-  async loadRecords() {
-    if (this.data.loading) return
+  async loadRecords(page = this.data.page) {
+    if (this.data.loading) return Promise.resolve()
 
     this.setData({ loading: true })
     try {
-      const res = await api.getRecords(this.data.page)
+      const res = await api.getRecords(page)
+      if (!res || res.code !== 0) {
+        throw new Error((res && res.message) || '加载记录失败')
+      }
+
       this.setData({
-        records: res.data,
+        records: res.data || [],
         loading: false,
-        hasMore: res.data.length >= 10
+        page,
+        hasMore: res.hasMore !== undefined ? res.hasMore : (res.data || []).length >= 10
       })
     } catch (err) {
       console.error('加载失败', err)
       this.setData({ loading: false })
     }
+  },
+
+  // 刷新记录
+  refreshRecords() {
+    return this.loadRecords(1)
   },
 
   // 加载更多
@@ -45,9 +55,14 @@ Page({
   async loadMoreRecords() {
     try {
       const res = await api.getRecords(this.data.page)
+      if (!res || res.code !== 0) {
+        throw new Error((res && res.message) || '加载更多失败')
+      }
+
+      const data = res.data || []
       this.setData({
-        records: [...this.data.records, ...res.data],
-        hasMore: res.data.length >= 10
+        records: [...this.data.records, ...data],
+        hasMore: res.hasMore !== undefined ? res.hasMore : data.length >= 10
       })
     } catch (err) {
       console.error('加载更多失败', err)
@@ -64,8 +79,7 @@ Page({
 
   // 下拉刷新
   onPullDownRefresh() {
-    this.setData({ page: 1 })
-    this.loadRecords().then(() => {
+    this.refreshRecords().then(() => {
       wx.stopPullDownRefresh()
     })
   }

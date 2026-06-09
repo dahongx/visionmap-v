@@ -24,10 +24,7 @@ Page({
   },
 
   onUnload() {
-    // 清除定时器
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer)
-    }
+    this.clearPollTimer()
   },
 
   // 获取用户积分
@@ -51,6 +48,10 @@ Page({
   async loadRecentRecords() {
     try {
       const res = await api.getRecords(1, 5)
+      if (!res || res.code !== 0) {
+        throw new Error((res && res.message) || '加载记录失败')
+      }
+
       this.setData({
         recentRecords: res.data || []
       })
@@ -160,7 +161,12 @@ Page({
 
       this.setData({ loadingText: '正在生成导图，请耐心等待...' })
 
-      // 4. 轮询查询处理状态
+      if (analyzeRes.data.status === 'completed') {
+        this.finishGenerate(recordId)
+        return
+      }
+
+      // 4. 轮询查询处理状态（兼容云端返回 processing 的情况）
       this.pollResult(recordId)
 
     } catch (err) {
@@ -173,14 +179,44 @@ Page({
     }
   },
 
+  // 生成完成
+  finishGenerate(recordId) {
+    this.clearPollTimer()
+    this.setData({ loading: false })
+    this.getUserPoints()
+    this.loadRecentRecords()
+
+    wx.navigateTo({
+      url: `/pages/result/result?mindmapId=${recordId}`
+    })
+  },
+
+  // 清除轮询定时器
+  clearPollTimer() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer)
+      this.pollTimer = null
+    }
+  },
+
   // 轮询查询处理结果
   pollResult(recordId) {
     let pollCount = 0
+    const maxPollCount = 120
+
+    this.clearPollTimer()
 
     this.pollTimer = setInterval(async () => {
       pollCount++
 
       try {
+        if (pollCount > maxPollCount) {
+          this.clearPollTimer()
+          this.setData({ loading: false })
+          wx.showToast({ title: '生成超时，请稍后在历史记录查看', icon: 'none' })
+          return
+        }
+
         // 使用云函数查询记录状态
         const res = await api.getRecord(recordId)
 
@@ -193,20 +229,13 @@ Page({
 
         if (record.status === 'completed') {
           // 处理完成
-          clearInterval(this.pollTimer)
-          this.setData({ loading: false })
-          this.getUserPoints() // 刷新积分
-          this.loadRecentRecords() // 刷新记录
-
-          wx.navigateTo({
-            url: `/pages/result/result?mindmapId=${recordId}`
-          })
+          this.finishGenerate(recordId)
 
         } else if (record.status === 'failed') {
           // 处理失败
-          clearInterval(this.pollTimer)
+          this.clearPollTimer()
           this.setData({ loading: false })
-          wx.showToast({ title: '识别失败，请重试', icon: 'none' })
+          wx.showToast({ title: record.error || '识别失败，请重试', icon: 'none' })
 
         } else {
           // 仍在处理中，继续等待

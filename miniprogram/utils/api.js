@@ -68,20 +68,25 @@ const generateMindmap = async (data, mapType) => {
 
 // 获取思维导图
 const getMindmap = async (mindmapId) => {
-  const db = wx.cloud.database()
-  const res = await db.collection('records').doc(mindmapId).get()
-  return res.data
+  const res = await wx.cloud.callFunction({
+    name: 'get-record',
+    data: { action: 'detail', recordId: mindmapId }
+  })
+
+  if (res.result && res.result.code === 0) {
+    return res.result.data
+  }
+
+  throw new Error((res.result && res.result.message) || '获取导图失败')
 }
 
 // 获取记录列表
 const getRecords = async (page = 1, pageSize = 10) => {
-  const db = wx.cloud.database()
-  const res = await db.collection('records')
-    .orderBy('createdAt', 'desc')
-    .skip((page - 1) * pageSize)
-    .limit(pageSize)
-    .get()
-  return { data: res.data }
+  const res = await wx.cloud.callFunction({
+    name: 'get-record',
+    data: { action: 'list', page, pageSize }
+  })
+  return res.result
 }
 
 // 更新用户信息
@@ -97,7 +102,7 @@ const updateUserInfo = async (userInfo) => {
 const getRecord = async (recordId) => {
   const res = await wx.cloud.callFunction({
     name: 'get-record',
-    data: { recordId }
+    data: { action: 'detail', recordId }
   })
   return res.result
 }

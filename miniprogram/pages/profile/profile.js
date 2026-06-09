@@ -28,6 +28,10 @@ Page({
   async loadPoints() {
     try {
       const res = await api.getUserPoints()
+      if (!res || res.code !== 0) {
+        throw new Error((res && res.message) || '获取积分失败')
+      }
+
       this.setData({
         points: res.points
       })
@@ -49,10 +53,17 @@ Page({
       })
 
       // 同步用户信息到后端
-      await api.updateUserInfo(res.userInfo)
+      const updateRes = await api.updateUserInfo(res.userInfo)
+      if (!updateRes || updateRes.code !== 0) {
+        throw new Error((updateRes && updateRes.message) || '同步用户信息失败')
+      }
 
     } catch (err) {
       console.error('登录失败', err)
+      wx.showToast({
+        title: err.message || '登录失败',
+        icon: 'none'
+      })
     }
   },
 
@@ -68,8 +79,12 @@ Page({
   async signIn() {
     try {
       const res = await api.signIn()
+      if (!res || res.code !== 0) {
+        throw new Error((res && res.message) || '签到失败')
+      }
+
       wx.showToast({
-        title: `签到成功 +${res.points}积分`,
+        title: `签到成功 +${res.added || 5}积分`,
         icon: 'success'
       })
       this.loadPoints()
@@ -80,6 +95,40 @@ Page({
         icon: 'none'
       })
     }
+  },
+
+  // 查看历史
+  showHistory() {
+    wx.switchTab({
+      url: '/pages/history/history'
+    })
+  },
+
+  // 帮助说明
+  showHelp() {
+    wx.showModal({
+      title: '帮助说明',
+      content: '在首页拍摄或选择一张文字清晰的手写笔记，系统会自动识别内容并生成可编辑导图。',
+      showCancel: false
+    })
+  },
+
+  // 常见问题
+  showFAQ() {
+    wx.showModal({
+      title: '常见问题',
+      content: '如果生成失败，请确认图片文字清晰、云函数已部署、CLAUDE_API_KEY 已配置。',
+      showCancel: false
+    })
+  },
+
+  // 意见反馈
+  feedback() {
+    wx.showModal({
+      title: '意见反馈',
+      content: '可以在小程序后台配置客服能力后接入在线反馈；当前版本请先通过管理员收集反馈。',
+      showCancel: false
+    })
   },
 
   // 关于我们

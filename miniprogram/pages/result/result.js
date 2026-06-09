@@ -8,6 +8,8 @@ Page({
     loadingText: '正在加载...',
     canvasWidth: 0,
     canvasHeight: 0,
+    canvasLeft: 0,
+    canvasTop: 0,
     scale: 1,
     offsetX: 0,
     offsetY: 0,
@@ -30,13 +32,29 @@ Page({
       this.setData({ mindmapId: options.mindmapId })
       this.loadMindmap(options.mindmapId)
     }
+  },
 
-    // 获取画布尺寸
+  onReady() {
+    this.updateCanvasSize(() => {
+      if (this.data.mindmapData) {
+        this.initCanvas()
+      }
+    })
+  },
+
+  // 获取画布尺寸
+  updateCanvasSize(callback) {
     const query = wx.createSelectorQuery()
     query.select('.mindmap-canvas').boundingClientRect((rect) => {
+      if (!rect) return
+
       this.setData({
         canvasWidth: rect.width,
-        canvasHeight: rect.height
+        canvasHeight: rect.height,
+        canvasLeft: rect.left || 0,
+        canvasTop: rect.top || 0
+      }, () => {
+        if (callback) callback()
       })
     }).exec()
   },
@@ -45,18 +63,27 @@ Page({
   async loadMindmap(mindmapId) {
     this.setData({ loading: true })
     try {
-      const res = await api.getMindmap(mindmapId)
+      const record = await api.getMindmap(mindmapId)
+
+      if (record.status === 'failed') {
+        throw new Error(record.error || '生成失败')
+      }
+
+      if (!record.resultJson) {
+        throw new Error(record.status === 'processing' ? '导图仍在生成中，请稍后再试' : '导图数据为空')
+      }
+
       this.setData({
-        mindmapData: res.data.resultJson,
+        mindmapData: record.resultJson,
         loading: false
+      }, () => {
+        this.initCanvas()
       })
-      // 初始化画布
-      this.initCanvas()
     } catch (err) {
       console.error('加载失败', err)
       this.setData({ loading: false })
       wx.showToast({
-        title: '加载失败',
+        title: err.message || '加载失败',
         icon: 'none'
       })
     }
@@ -72,10 +99,19 @@ Page({
   drawMindmap() {
     if (!this.ctx || !this.data.mindmapData) return
 
+    if (!this.data.canvasWidth || !this.data.canvasHeight) {
+      this.updateCanvasSize(() => {
+        this.drawMindmap()
+      })
+      return
+    }
+
     const ctx = this.ctx
     const data = this.data.mindmapData
     const centerX = this.data.canvasWidth / 2
     const centerY = this.data.canvasHeight / 2
+
+    this.nodePositions = {}
 
     // 清空画布
     ctx.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight)
@@ -243,8 +279,8 @@ Page({
   // 检查是否点击了节点
   checkNodeClick(x, y) {
     // 转换为画布坐标
-    const canvasX = (x - this.data.offsetX) / this.data.scale
-    const canvasY = (y - this.data.offsetY) / this.data.scale
+    const canvasX = (x - this.data.canvasLeft - this.data.offsetX) / this.data.scale
+    const canvasY = (y - this.data.canvasTop - this.data.offsetY) / this.data.scale
 
     // 检查是否在节点范围内
     for (const nodeId in this.nodePositions) {
@@ -407,12 +443,13 @@ Page({
       },
       fail: (err) => {
         wx.hideLoading()
+        console.error('导出失败', err)
         wx.showToast({
           title: '导出失败',
           icon: 'none'
         })
       }
-    })
+    }, this)
   },
 
   // 导出PDF
