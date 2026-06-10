@@ -5,6 +5,10 @@ const V_GAP = 34
 const EXPORT_PADDING = 80
 const MAX_EXPORT_SIZE = 3000
 const THEME_COLORS = ['#5b7cfa', '#7c4dba', '#1f9a8a', '#e07a3f', '#3c75d8', '#b54d8f']
+const LONG_PRESS_DELAY = 320
+const TAP_MOVE_TOLERANCE = 6
+const DRAG_EDGE_MARGIN = 54
+const AUTO_SCROLL_INTERVAL = 32
 
 Page({
   data: {
@@ -22,8 +26,6 @@ Page({
     offsetX: 0,
     offsetY: 0,
     dirty: false,
-    showEditModal: false,
-    editingText: '',
     selectedNodeId: null,
     selectedNodeText: '未选择节点'
   },
@@ -39,6 +41,12 @@ Page({
   drawTimer: null,
   isDrawing: false,
   pendingDraw: false,
+  lastTapNodeId: null,
+  lastTapTime: 0,
+  longPressTimer: null,
+  autoScrollTimer: null,
+  autoScrollSpeedX: 0,
+  autoScrollSpeedY: 0,
 
   onLoad(options) {
     if (options.mindmapId) {
@@ -329,6 +337,7 @@ Page({
     }
 
     this.isDrawing = true
+    const activeDrag = this.touchState && this.touchState.mode === 'nodeDrag'
 
     this.renderMap(this.ctx, {
       width: this.data.canvasWidth,
@@ -337,6 +346,8 @@ Page({
       offsetX: this.data.offsetX,
       offsetY: this.data.offsetY,
       selectedNodeId: this.data.selectedNodeId,
+      dragPreview: activeDrag ? this.touchState.dragPreview : null,
+      dropHint: activeDrag ? this.touchState.dropHint : null,
       background: '#ffffff',
       done: () => {
         this.isDrawing = false
@@ -368,7 +379,9 @@ Page({
     ctx.scale(options.scale, options.scale)
 
     this.drawConnections(ctx, this.layoutTree)
-    this.drawLayoutNode(ctx, this.layoutTree, options.selectedNodeId)
+    this.drawLayoutNode(ctx, this.layoutTree, options.selectedNodeId, options.dragPreview)
+    this.drawDropHint(ctx, options.dropHint)
+    this.drawDragPreview(ctx, options.dragPreview)
 
     ctx.restore()
     ctx.draw(false, () => {
@@ -395,11 +408,12 @@ Page({
     })
   },
 
-  drawLayoutNode(ctx, layoutNode, selectedNodeId) {
+  drawLayoutNode(ctx, layoutNode, selectedNodeId, dragPreview) {
     const depth = layoutNode.depth
     const isRoot = depth === 0
     const isPrimary = depth === 1
     const isSelected = layoutNode.id === selectedNodeId
+    const isDragging = dragPreview && layoutNode.id === dragPreview.nodeId
     const color = this.getDepthColor(depth)
     const x = layoutNode.x - layoutNode.width / 2
     const y = layoutNode.y - layoutNode.height / 2
@@ -409,7 +423,14 @@ Page({
       y,
       width: layoutNode.width,
       height: layoutNode.height,
+      depth,
+      lines: layoutNode.lines,
       node: layoutNode.node
+    }
+
+    if (isDragging) {
+      ctx.save()
+      if (ctx.setGlobalAlpha) ctx.setGlobalAlpha(0.22)
     }
 
     ctx.beginPath()
@@ -439,7 +460,94 @@ Page({
       ctx.fillText(line, layoutNode.x, startY + index * lineHeight)
     })
 
-    layoutNode.children.forEach((child) => this.drawLayoutNode(ctx, child, selectedNodeId))
+    if (isDragging) {
+      ctx.restore()
+    }
+
+    layoutNode.children.forEach((child) => this.drawLayoutNode(ctx, child, selectedNodeId, dragPreview))
+  },
+
+  drawDropHint(ctx, hint) {
+    if (!hint) return
+
+    const pos = this.nodePositions[hint.targetId]
+    if (!pos) return
+
+    const color = hint.type === 'child' ? '#16a34a' : '#5b7cfa'
+
+    ctx.save()
+    ctx.setStrokeStyle(color)
+    ctx.setFillStyle(color)
+    ctx.setLineWidth(2.6)
+
+    if (hint.type === 'child') {
+      this.roundRect(ctx, pos.x - 7, pos.y - 7, pos.width + 14, pos.height + 14, 10)
+      ctx.stroke()
+
+      const markerX = pos.x + pos.width + 14
+      const markerY = pos.y + pos.height / 2
+      ctx.beginPath()
+      ctx.moveTo(pos.x + pos.width + 3, markerY)
+      ctx.lineTo(markerX + 18, markerY)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(markerX + 22, markerY, 4, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      const y = hint.position === 'before' ? pos.y - 12 : pos.y + pos.height + 12
+      const x1 = pos.x - 18
+      const x2 = pos.x + pos.width + 18
+
+      ctx.beginPath()
+      ctx.moveTo(x1, y)
+      ctx.lineTo(x2, y)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(x1, y, 4, 0, Math.PI * 2)
+      ctx.arc(x2, y, 4, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    ctx.restore()
+  },
+
+  drawDragPreview(ctx, preview) {
+    if (!preview) return
+
+    const source = this.nodePositions[preview.nodeId]
+    if (!source) return
+
+    const depth = source.depth || 0
+    const isRoot = depth === 0
+    const isPrimary = depth === 1
+    const width = source.width
+    const height = source.height
+    const x = preview.centerX - width / 2
+    const y = preview.centerY - height / 2
+    const color = this.getDepthColor(depth)
+    const lines = source.lines || [source.node.text || '未命名']
+    const style = this.getNodeStyle(depth)
+
+    ctx.save()
+    if (ctx.setGlobalAlpha) ctx.setGlobalAlpha(0.86)
+    ctx.beginPath()
+    ctx.setFillStyle(isRoot || isPrimary ? color : '#ffffff')
+    ctx.setStrokeStyle('#111827')
+    ctx.setLineWidth(2.4)
+    this.roundRect(ctx, x, y, width, height, isRoot ? 8 : 7)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.setFontSize(style.fontSize)
+    ctx.setFillStyle(isRoot || isPrimary ? '#ffffff' : '#273142')
+    ctx.setTextAlign('center')
+    ctx.setTextBaseline('middle')
+
+    const startY = preview.centerY - ((lines.length - 1) * style.lineHeight) / 2
+    lines.forEach((line, index) => {
+      ctx.fillText(line, preview.centerX, startY + index * style.lineHeight)
+    })
+    ctx.restore()
   },
 
   getDepthColor(depth) {
@@ -471,17 +579,32 @@ Page({
   },
 
   onTouchStart(e) {
+    this.clearLongPressTimer()
+    this.clearAutoScrollTimer()
+
     if (e.touches.length === 1) {
       const touch = e.touches[0]
+      const nodeId = this.getNodeAt(touch.clientX, touch.clientY)
+      const canDrag = !!(nodeId && this.data.mindmapData && nodeId !== this.data.mindmapData.id)
+
       this.touchState = {
-        mode: 'pan',
+        mode: nodeId ? 'pendingNode' : 'pan',
+        nodeId,
+        canDrag,
         startX: touch.clientX,
         startY: touch.clientY,
         lastX: touch.clientX,
         lastY: touch.clientY,
         moved: false
       }
+
+      if (canDrag) {
+        this.longPressTimer = setTimeout(() => {
+          this.startNodeDrag()
+        }, LONG_PRESS_DELAY)
+      }
     } else if (e.touches.length === 2) {
+      this.clearLongPressTimer()
       const center = this.getTouchCenter(e.touches)
       this.touchState = {
         mode: 'pinch',
@@ -499,22 +622,31 @@ Page({
   onTouchMove(e) {
     if (!this.touchState) return
 
-    if (this.touchState.mode === 'pan' && e.touches.length === 1) {
+    if ((this.touchState.mode === 'pan' || this.touchState.mode === 'pendingNode') && e.touches.length === 1) {
       const touch = e.touches[0]
       const deltaX = touch.clientX - this.touchState.lastX
       const deltaY = touch.clientY - this.touchState.lastY
       const totalX = touch.clientX - this.touchState.startX
       const totalY = touch.clientY - this.touchState.startY
 
-      if (Math.abs(totalX) > 4 || Math.abs(totalY) > 4) {
+      if (Math.abs(totalX) > TAP_MOVE_TOLERANCE || Math.abs(totalY) > TAP_MOVE_TOLERANCE) {
         this.touchState.moved = true
+        if (this.touchState.mode === 'pendingNode') {
+          this.clearLongPressTimer()
+          this.touchState.mode = 'pan'
+        }
       }
 
-      this.data.offsetX += deltaX
-      this.data.offsetY += deltaY
+      if (this.touchState.mode === 'pan') {
+        this.data.offsetX += deltaX
+        this.data.offsetY += deltaY
+      }
       this.touchState.lastX = touch.clientX
       this.touchState.lastY = touch.clientY
-      this.scheduleDraw()
+      if (this.touchState.mode === 'pan') this.scheduleDraw()
+    } else if (this.touchState.mode === 'nodeDrag' && e.touches.length === 1) {
+      const touch = e.touches[0]
+      this.updateNodeDrag(touch.clientX, touch.clientY)
     } else if (this.touchState.mode === 'pinch' && e.touches.length === 2) {
       const distance = this.getTouchDistance(e.touches)
       const nextScale = this.clamp(this.touchState.scale * (distance / this.touchState.distance), 0.35, 2.5)
@@ -531,9 +663,41 @@ Page({
   onTouchEnd(e) {
     if (!this.touchState) return
 
-    if (this.touchState.mode === 'pan' && !this.touchState.moved && e.changedTouches.length === 1) {
+    this.clearLongPressTimer()
+    this.clearAutoScrollTimer()
+
+    if (this.touchState.mode === 'nodeDrag') {
+      const draggedId = this.touchState.nodeId
+      const dropHint = this.touchState.dropHint
+      this.touchState = null
+
+      this.setData({
+        scale: this.data.scale,
+        offsetX: this.data.offsetX,
+        offsetY: this.data.offsetY
+      })
+
+      if (dropHint) {
+        this.applyDropHint(draggedId, dropHint)
+      } else {
+        this.drawMindmap()
+      }
+      return
+    }
+
+    if ((this.touchState.mode === 'pan' || this.touchState.mode === 'pendingNode') && !this.touchState.moved && e.changedTouches.length === 1) {
       const touch = e.changedTouches[0]
-      this.selectNodeAt(touch.clientX, touch.clientY)
+      const selectedNodeId = this.selectNodeAt(touch.clientX, touch.clientY)
+      const now = Date.now()
+
+      if (selectedNodeId && this.lastTapNodeId === selectedNodeId && now - this.lastTapTime < 320) {
+        this.lastTapNodeId = null
+        this.lastTapTime = 0
+        this.openEditModal(selectedNodeId)
+      } else {
+        this.lastTapNodeId = selectedNodeId
+        this.lastTapTime = now
+      }
     }
 
     this.setData({
@@ -542,6 +706,123 @@ Page({
       offsetY: this.data.offsetY
     })
     this.touchState = null
+  },
+
+  onTouchCancel() {
+    this.clearLongPressTimer()
+    this.clearAutoScrollTimer()
+    this.touchState = null
+    this.drawMindmap()
+  },
+
+  clearLongPressTimer() {
+    if (!this.longPressTimer) return
+    clearTimeout(this.longPressTimer)
+    this.longPressTimer = null
+  },
+
+  clearAutoScrollTimer() {
+    if (this.autoScrollTimer) {
+      clearInterval(this.autoScrollTimer)
+      this.autoScrollTimer = null
+    }
+    this.autoScrollSpeedX = 0
+    this.autoScrollSpeedY = 0
+  },
+
+  startNodeDrag() {
+    const state = this.touchState
+    if (!state || state.mode !== 'pendingNode' || !state.canDrag) return
+
+    const pos = this.nodePositions[state.nodeId]
+    if (!pos) return
+
+    const world = this.screenToWorld(state.lastX, state.lastY)
+    state.mode = 'nodeDrag'
+    state.moved = true
+    state.touchOffsetX = world.x - (pos.x + pos.width / 2)
+    state.touchOffsetY = world.y - (pos.y + pos.height / 2)
+    state.dragPreview = {
+      nodeId: state.nodeId,
+      centerX: pos.x + pos.width / 2,
+      centerY: pos.y + pos.height / 2
+    }
+    state.dropHint = null
+
+    this.setData({
+      selectedNodeId: state.nodeId,
+      selectedNodeText: pos.node.text || '未命名'
+    }, () => this.scheduleDraw())
+
+    if (wx.vibrateShort) {
+      wx.vibrateShort({ type: 'light' })
+    }
+  },
+
+  updateNodeDrag(clientX, clientY) {
+    const state = this.touchState
+    if (!state || state.mode !== 'nodeDrag') return
+
+    state.lastX = clientX
+    state.lastY = clientY
+
+    const world = this.screenToWorld(clientX, clientY)
+    const centerX = world.x - state.touchOffsetX
+    const centerY = world.y - state.touchOffsetY
+    state.dragPreview = {
+      nodeId: state.nodeId,
+      centerX,
+      centerY
+    }
+    state.dropHint = this.getDropHint(state.nodeId, centerX, centerY)
+
+    this.updateAutoScroll(clientX, clientY)
+    this.scheduleDraw()
+  },
+
+  updateAutoScroll(clientX, clientY) {
+    const localX = clientX - this.data.canvasLeft
+    const localY = clientY - this.data.canvasTop
+    const width = this.data.canvasWidth
+    const height = this.data.canvasHeight
+
+    const toSpeed = (distance) => {
+      if (distance <= 0) return 0
+      return this.clamp(distance * 0.22, 4, 16)
+    }
+
+    if (localX < DRAG_EDGE_MARGIN) {
+      this.autoScrollSpeedX = toSpeed(DRAG_EDGE_MARGIN - localX)
+    } else if (localX > width - DRAG_EDGE_MARGIN) {
+      this.autoScrollSpeedX = -toSpeed(localX - (width - DRAG_EDGE_MARGIN))
+    } else {
+      this.autoScrollSpeedX = 0
+    }
+
+    if (localY < DRAG_EDGE_MARGIN) {
+      this.autoScrollSpeedY = toSpeed(DRAG_EDGE_MARGIN - localY)
+    } else if (localY > height - DRAG_EDGE_MARGIN) {
+      this.autoScrollSpeedY = -toSpeed(localY - (height - DRAG_EDGE_MARGIN))
+    } else {
+      this.autoScrollSpeedY = 0
+    }
+
+    if ((this.autoScrollSpeedX || this.autoScrollSpeedY) && !this.autoScrollTimer) {
+      this.autoScrollTimer = setInterval(() => this.tickAutoScroll(), AUTO_SCROLL_INTERVAL)
+    } else if (!this.autoScrollSpeedX && !this.autoScrollSpeedY) {
+      this.clearAutoScrollTimer()
+    }
+  },
+
+  tickAutoScroll() {
+    if (!this.touchState || this.touchState.mode !== 'nodeDrag') {
+      this.clearAutoScrollTimer()
+      return
+    }
+
+    this.data.offsetX += this.autoScrollSpeedX
+    this.data.offsetY += this.autoScrollSpeedY
+    this.updateNodeDrag(this.touchState.lastX, this.touchState.lastY)
   },
 
   getTouchDistance(touches) {
@@ -557,20 +838,170 @@ Page({
     }
   },
 
-  selectNodeAt(x, y) {
-    const canvasX = (x - this.data.canvasLeft - this.data.offsetX) / this.data.scale
-    const canvasY = (y - this.data.canvasTop - this.data.offsetY) / this.data.scale
+  screenToWorld(clientX, clientY) {
+    return {
+      x: (clientX - this.data.canvasLeft - this.data.offsetX) / this.data.scale,
+      y: (clientY - this.data.canvasTop - this.data.offsetY) / this.data.scale
+    }
+  },
 
-    for (const nodeId in this.nodePositions) {
+  getNodeAt(clientX, clientY, excludeNodeId) {
+    const world = this.screenToWorld(clientX, clientY)
+    const padding = this.clamp(10 / this.data.scale, 8, 22)
+    const nodeIds = Object.keys(this.nodePositions).reverse()
+
+    for (let i = 0; i < nodeIds.length; i++) {
+      const nodeId = nodeIds[i]
+      if (nodeId === excludeNodeId) continue
+
       const pos = this.nodePositions[nodeId]
-      if (canvasX >= pos.x && canvasX <= pos.x + pos.width && canvasY >= pos.y && canvasY <= pos.y + pos.height) {
-        this.setData({
-          selectedNodeId: nodeId,
-          selectedNodeText: pos.node.text || '未命名'
-        }, () => this.drawMindmap())
-        return
+      if (
+        world.x >= pos.x - padding &&
+        world.x <= pos.x + pos.width + padding &&
+        world.y >= pos.y - padding &&
+        world.y <= pos.y + pos.height + padding
+      ) {
+        return nodeId
       }
     }
+
+    return null
+  },
+
+  getDropHint(draggedId, centerX, centerY) {
+    const dragged = this.findNode(draggedId)
+    if (!dragged || !dragged.parent) return null
+
+    const scale = this.data.scale || 1
+    const magnetRange = this.clamp(150 / scale, 110, 260)
+    let best = null
+
+    Object.keys(this.nodePositions).forEach((targetId) => {
+      if (targetId === draggedId || this.nodeContains(dragged.node, targetId)) return
+
+      const pos = this.nodePositions[targetId]
+      const target = this.findNode(targetId)
+      if (!pos || !target) return
+
+      const targetCenterX = pos.x + pos.width / 2
+      const targetCenterY = pos.y + pos.height / 2
+      const distanceX = Math.abs(centerX - targetCenterX)
+      const distanceY = Math.abs(centerY - targetCenterY)
+      const inRange = distanceX <= pos.width / 2 + magnetRange && distanceY <= pos.height / 2 + magnetRange
+      if (!inRange) return
+
+      const sameColumn = distanceX <= Math.max(pos.width * 0.9, 100 / scale)
+      const nearTop = centerY < pos.y + pos.height * 0.32
+      const nearBottom = centerY > pos.y + pos.height * 0.68
+      let hint = null
+      let score = Infinity
+
+      if (target.parent && sameColumn && (nearTop || nearBottom)) {
+        const position = centerY < targetCenterY ? 'before' : 'after'
+        const edgeY = position === 'before' ? pos.y : pos.y + pos.height
+        hint = { type: 'sibling', targetId, position }
+        score = distanceX * 0.55 + Math.abs(centerY - edgeY) * 1.3
+      } else {
+        const insideHorizontalMagnet = centerX >= pos.x - 36 / scale && centerX <= pos.x + pos.width + H_GAP * 1.12
+        const insideVerticalMagnet = distanceY <= Math.max(pos.height * 0.95, 58 / scale)
+        if (insideHorizontalMagnet && insideVerticalMagnet) {
+          hint = { type: 'child', targetId }
+          score = Math.max(0, distanceX - pos.width / 2) * 0.75 + distanceY
+        }
+      }
+
+      if (!hint || this.isSameDropPlacement(dragged, hint, target)) return
+      if (!best || score < best.score) {
+        best = { hint, score }
+      }
+    })
+
+    return best && best.score <= magnetRange * 1.35 ? best.hint : null
+  },
+
+  isSameDropPlacement(dragged, hint, target) {
+    if (!dragged.parent || !target) return false
+
+    if (hint.type === 'child') {
+      return dragged.parent.id === hint.targetId && dragged.index === dragged.parent.children.length - 1
+    }
+
+    if (!target.parent || dragged.parent.id !== target.parent.id) return false
+
+    if (hint.position === 'before') {
+      return dragged.index === target.index - 1
+    }
+
+    return dragged.index === target.index + 1
+  },
+
+  applyDropHint(draggedId, hint) {
+    const dragged = this.findNode(draggedId)
+    if (!dragged || !dragged.parent || !hint) {
+      this.drawMindmap()
+      return false
+    }
+
+    const targetBeforeMove = this.findNode(hint.targetId)
+    if (!targetBeforeMove || this.nodeContains(dragged.node, hint.targetId) || this.isSameDropPlacement(dragged, hint, targetBeforeMove)) {
+      this.drawMindmap()
+      return false
+    }
+
+    this.pushHistory()
+    const movingNode = dragged.parent.children.splice(dragged.index, 1)[0]
+    let inserted = false
+
+    if (hint.type === 'child') {
+      const target = this.findNode(hint.targetId)
+      if (target) {
+        target.node.children.push(movingNode)
+        inserted = true
+      }
+    } else {
+      const target = this.findNode(hint.targetId)
+      if (target && target.parent) {
+        const insertIndex = target.index + (hint.position === 'after' ? 1 : 0)
+        target.parent.children.splice(insertIndex, 0, movingNode)
+        inserted = true
+      }
+    }
+
+    if (!inserted) {
+      this.historyStack.pop()
+      dragged.parent.children.splice(dragged.index, 0, movingNode)
+      this.drawMindmap()
+      return false
+    }
+
+    this.markDirtyAndRender(movingNode.id)
+    return true
+  },
+
+  nodeContains(node, targetId) {
+    if (!node || !Array.isArray(node.children)) return false
+
+    for (let i = 0; i < node.children.length; i++) {
+      const child = node.children[i]
+      if (child.id === targetId || this.nodeContains(child, targetId)) return true
+    }
+
+    return false
+  },
+
+  selectNodeAt(x, y) {
+    const nodeId = this.getNodeAt(x, y)
+
+    if (nodeId) {
+      const pos = this.nodePositions[nodeId]
+      this.setData({
+        selectedNodeId: nodeId,
+        selectedNodeText: pos.node.text || '未命名'
+      }, () => this.drawMindmap())
+      return nodeId
+    }
+
+    return null
   },
 
   zoomIn() {
@@ -680,47 +1111,36 @@ Page({
     }, () => this.relayoutAndDraw())
   },
 
-  openEditModal() {
-    const target = this.findNode(this.data.selectedNodeId)
+  openEditModal(nodeIdOrEvent, options = {}) {
+    const nodeId = typeof nodeIdOrEvent === 'string' ? nodeIdOrEvent : this.data.selectedNodeId
+    const target = this.findNode(nodeId)
     if (!target) {
       wx.showToast({ title: '请先选择节点', icon: 'none' })
       return
     }
 
-    this.setData({
-      showEditModal: true,
-      editingText: target.node.text || ''
+    wx.showModal({
+      title: '编辑节点',
+      editable: true,
+      placeholderText: '输入节点内容',
+      content: target.node.text || '',
+      confirmText: '保存',
+      success: (res) => {
+        if (!res.confirm) return
+
+        const text = String(res.content || '').trim()
+        if (!text) {
+          wx.showToast({ title: '节点内容不能为空', icon: 'none' })
+          return
+        }
+
+        if (options.pushHistory !== false) {
+          this.pushHistory()
+        }
+        target.node.text = text
+        this.markDirtyAndRender(target.node.id)
+      }
     })
-  },
-
-  onNodeInput(e) {
-    this.setData({ editingText: e.detail.value })
-  },
-
-  cancelEdit() {
-    this.setData({
-      showEditModal: false,
-      editingText: ''
-    })
-  },
-
-  confirmEdit() {
-    const target = this.findNode(this.data.selectedNodeId)
-    if (!target) return
-
-    const text = this.data.editingText.trim()
-    if (!text) {
-      wx.showToast({ title: '节点内容不能为空', icon: 'none' })
-      return
-    }
-
-    this.pushHistory()
-    target.node.text = text
-    this.setData({
-      showEditModal: false,
-      editingText: ''
-    })
-    this.markDirtyAndRender(target.node.id)
   },
 
   addNode() {
@@ -742,10 +1162,7 @@ Page({
     }
     target.node.children.push(newNode)
     this.markDirtyAndRender(newNode.id)
-    this.setData({
-      showEditModal: true,
-      editingText: newNode.text
-    })
+    this.openEditModal(newNode.id, { pushHistory: false })
   },
 
   addSiblingNode() {
@@ -763,10 +1180,7 @@ Page({
     }
     target.parent.children.splice(target.index + 1, 0, newNode)
     this.markDirtyAndRender(newNode.id)
-    this.setData({
-      showEditModal: true,
-      editingText: newNode.text
-    })
+    this.openEditModal(newNode.id, { pushHistory: false })
   },
 
   deleteNode() {

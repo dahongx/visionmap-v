@@ -15,7 +15,8 @@
       disable-scroll="true"
       bindtouchstart="onTouchStart"
       catchtouchmove="onTouchMove"
-      bindtouchend="onTouchEnd"></canvas>
+      bindtouchend="onTouchEnd"
+      bindtouchcancel="onTouchCancel"></canvas>
     <view class="selection-chip" wx:if="{{selectedNodeId}}">
       <text>{{selectedNodeText}}</text>
     </view>
@@ -37,17 +38,6 @@
     canvas-id="exportCanvas"
     class="export-canvas"
     style="width: {{exportCanvasWidth}}px; height: {{exportCanvasHeight}}px;"></canvas>
-
-  <view class="edit-modal" wx:if="{{showEditModal}}">
-    <view class="edit-content">
-      <text class="edit-title">编辑节点</text>
-      <textarea class="edit-input" value="{{editingText}}" bindinput="onNodeInput" auto-height="true" maxlength="120" placeholder="输入节点内容"/>
-      <view class="edit-buttons">
-        <view class="edit-btn cancel" bindtap="cancelEdit">取消</view>
-        <view class="edit-btn confirm" bindtap="confirmEdit">确定</view>
-      </view>
-    </view>
-  </view>
 </view>
 
 <view class="loading-mask" wx:if="{{loading}}">
