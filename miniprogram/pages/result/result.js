@@ -53,6 +53,15 @@ Page({
       this.setData({ mindmapId: options.mindmapId })
       this.loadMindmap(options.mindmapId)
     }
+    // 从首页带过来的本次消耗积分，进页面后轻提示一次
+    const charged = Number(options.charged) || 0
+    if (charged > 0) {
+      wx.showToast({
+        title: `本次消耗 ${charged} 积分`,
+        icon: 'none',
+        duration: 2500
+      })
+    }
   },
 
   onReady() {

@@ -290,12 +290,14 @@ async function processImage(fileID) {
   const apiTime = Date.now() - startTime
   console.log('AI API调用完成，耗时:', apiTime, 'ms')
 
-  // 读取 token 用量（Anthropic 标准格式 usage.input_tokens / output_tokens）
+  // 打印完整原始 usage，确认 mimo 用什么字段名
+  console.log('原始usage:', JSON.stringify(response.data.usage))
+
+  // 兼容 Anthropic 风格(input_tokens/output_tokens) 和 OpenAI 风格(prompt_tokens/completion_tokens)
   const usageRaw = response.data.usage || {}
-  const usage = {
-    inputTokens: Number(usageRaw.input_tokens) || 0,
-    outputTokens: Number(usageRaw.output_tokens) || 0
-  }
+  const inputTokens = Number(usageRaw.input_tokens) || Number(usageRaw.prompt_tokens) || 0
+  const outputTokens = Number(usageRaw.output_tokens) || Number(usageRaw.completion_tokens) || 0
+  const usage = { inputTokens, outputTokens }
   console.log('token用量:', JSON.stringify(usage))
 
   const content = response.data.content[0].text

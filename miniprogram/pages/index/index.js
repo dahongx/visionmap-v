@@ -208,24 +208,27 @@ Page({
     this.getUserPoints()
     this.loadRecentRecords()
 
-    // 弹窗告知本次消耗的积分，用户确认后查看结果
+    const charged = pointsCharged || 0
+
+    // 跳转到结果页（带上本次消耗的积分，结果页也会显示）
     const goResult = () => {
       wx.navigateTo({
-        url: `/pages/result/result?mindmapId=${recordId}`
+        url: `/pages/result/result?mindmapId=${recordId}&charged=${charged}`
       })
     }
 
-    if (pointsCharged && pointsCharged > 0) {
-      wx.showModal({
-        title: '生成完成',
-        content: `本次消耗 ${pointsCharged} 积分，可继续查看和编辑。`,
-        showCancel: false,
-        confirmText: '查看导图',
-        success: goResult
-      })
-    } else {
-      goResult()
-    }
+    // 弹窗告知本次消耗，必须点「查看导图」才继续
+    wx.showModal({
+      title: '生成完成',
+      content: charged > 0
+        ? `本次消耗 ${charged} 积分，可继续查看和编辑。`
+        : '导图已生成，可继续查看和编辑。',
+      showCancel: false,
+      confirmText: '查看导图',
+      success: () => {
+        goResult()
+      }
+    })
   },
 
   // 清除轮询定时器
