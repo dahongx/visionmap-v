@@ -209,6 +209,7 @@ Page({
     this.loadRecentRecords()
 
     const charged = pointsCharged || 0
+    console.log('[finishGenerate] 准备弹窗，消耗积分:', charged)
 
     // 跳转到结果页（带上本次消耗的积分，结果页也会显示）
     const goResult = () => {
@@ -225,7 +226,8 @@ Page({
         : '导图已生成，可继续查看和编辑。',
       showCancel: false,
       confirmText: '查看导图',
-      success: () => {
+      complete: (res) => {
+        console.log('[finishGenerate] 弹窗关闭', res)
         goResult()
       }
     })
