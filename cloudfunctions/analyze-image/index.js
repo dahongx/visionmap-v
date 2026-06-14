@@ -93,9 +93,9 @@ exports.main = async (event, context) => {
 }
 
 async function processImage(fileID) {
-  const apiKey = process.env.CLAUDE_API_KEY
+  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.CLAUDE_API_KEY
   if (!apiKey) {
-    throw new Error('未配置 CLAUDE_API_KEY 环境变量')
+    throw new Error('未配置 ANTHROPIC_AUTH_TOKEN 环境变量')
   }
 
   console.log('正在下载图片...')
