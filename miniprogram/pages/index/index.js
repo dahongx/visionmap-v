@@ -123,21 +123,21 @@ Page({
       return
     }
 
-    // 测试模式：跳过积分检查
-    // if (this.data.points < 10) {
-    //   wx.showModal({
-    //     title: '积分不足',
-    //     content: '当前积分不足，是否邀请好友获取积分？',
-    //     confirmText: '去邀请',
-    //     cancelText: '取消',
-    //     success: (res) => {
-    //       if (res.confirm) {
-    //         wx.switchTab({ url: '/pages/profile/profile' })
-    //       }
-    //     }
-    //   })
-    //   return
-    // }
+    // 生成前检查积分：低于10分拦截，提示充值
+    if (this.data.points < 10) {
+      wx.showModal({
+        title: '积分不足',
+        content: '当前积分不足 10，无法生成。请先充值积分。',
+        confirmText: '去充值',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) {
+            wx.switchTab({ url: '/pages/profile/profile' })
+          }
+        }
+      })
+      return
+    }
 
     this.setData({
       loading: true,
@@ -154,22 +154,37 @@ Page({
 
       this.setData({ loadingText: '正在识别笔迹...' })
 
-      // 2. 调用云函数（立即返回记录ID）
+      // 2. 调用云函数（同步返回，已扣费）
       const analyzeRes = await api.analyzeImage(uploadRes.fileID)
+
+      // 积分不足（云端二次校验）
+      if (analyzeRes.code === 1001) {
+        this.setData({ loading: false })
+        wx.showModal({
+          title: '积分不足',
+          content: analyzeRes.message || '积分不足，请先充值',
+          confirmText: '去充值',
+          cancelText: '取消',
+          success: (res) => {
+            if (res.confirm) {
+              wx.switchTab({ url: '/pages/profile/profile' })
+            }
+          }
+        })
+        return
+      }
 
       if (analyzeRes.code !== 0) {
         throw new Error(analyzeRes.message || '分析失败')
       }
 
       const recordId = analyzeRes.data._id
-
-      // 3. 测试模式：不扣除积分
-      // await api.deductPoints(10, '手写笔记转导图')
+      const pointsCharged = analyzeRes.data.pointsCharged || 0
 
       this.setData({ loadingText: '正在生成导图，请耐心等待...' })
 
       if (analyzeRes.data.status === 'completed') {
-        this.finishGenerate(recordId)
+        this.finishGenerate(recordId, pointsCharged)
         return
       }
 
@@ -187,15 +202,30 @@ Page({
   },
 
   // 生成完成
-  finishGenerate(recordId) {
+  finishGenerate(recordId, pointsCharged) {
     this.clearPollTimer()
     this.setData({ loading: false })
     this.getUserPoints()
     this.loadRecentRecords()
 
-    wx.navigateTo({
-      url: `/pages/result/result?mindmapId=${recordId}`
-    })
+    // 弹窗告知本次消耗的积分，用户确认后查看结果
+    const goResult = () => {
+      wx.navigateTo({
+        url: `/pages/result/result?mindmapId=${recordId}`
+      })
+    }
+
+    if (pointsCharged && pointsCharged > 0) {
+      wx.showModal({
+        title: '生成完成',
+        content: `本次消耗 ${pointsCharged} 积分，可继续查看和编辑。`,
+        showCancel: false,
+        confirmText: '查看导图',
+        success: goResult
+      })
+    } else {
+      goResult()
+    }
   },
 
   // 清除轮询定时器
@@ -236,7 +266,7 @@ Page({
 
         if (record.status === 'completed') {
           // 处理完成
-          this.finishGenerate(recordId)
+          this.finishGenerate(recordId, record.pointsCost || 0)
 
         } else if (record.status === 'failed') {
           // 处理失败
